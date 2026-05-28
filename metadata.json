@@ -1,0 +1,6 @@
+{
+  "name": "Smart Desa Digital",
+  "description": "Sistem informasi pelayanan dan kependudukan desa modern berbasis cloud, lengkap dengan pengelolaan APBDes, surat menyurat digital, bansos, inventaris, pengaduan, dan asisten analitik AI.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
