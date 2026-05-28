@@ -17,23 +17,36 @@ import {
   Sparkles,
   Eraser
 } from 'lucide-react';
-import { VillageProfile } from '../types';
+import { VillageProfile, PortalCredential } from '../types';
+import { saveTestConnectionDoc } from '../firebaseDb';
 
 interface PengaturanViewProps {
   profile: VillageProfile;
   saveProfile: (data: VillageProfile) => void;
   onLogAction: (action: string, module: string) => void;
+  portalCredentials: { credentials: PortalCredential[] };
+  savePortalCredentials: (data: { credentials: PortalCredential[] }) => void;
 }
 
 export default function PengaturanView({
   profile,
   saveProfile,
-  onLogAction
+  onLogAction,
+  portalCredentials,
+  savePortalCredentials
 }: PengaturanViewProps) {
   const [formProfile, setFormProfile] = useState<VillageProfile>({ ...profile });
   const [newMission, setNewMission] = useState('');
   const [signatureMode, setSignatureMode] = useState<'upload' | 'draw'>('upload');
   
+  // Real-time editable portal credentials
+  const [credentialsList, setCredentialsList] = useState<PortalCredential[]>([]);
+  const [newCredType, setNewCredType] = useState<'staf' | 'warga'>('warga');
+  const [newCredRole, setNewCredRole] = useState('Operator');
+  const [newCredName, setNewCredName] = useState('');
+  const [newCredNik, setNewCredNik] = useState('');
+  const [newCredPin, setNewCredPin] = useState('');
+
   // Canvas signature states
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -43,10 +56,123 @@ export default function PengaturanView({
   const logoInputRef = useRef<HTMLInputElement>(null);
   const signatureInputRef = useRef<HTMLInputElement>(null);
 
+  const [testStatus, setTestStatus] = useState<'idle' | 'loading' | 'success' | 'failed'>('idle');
+
+  const handleTestConnection = async () => {
+    setTestStatus('loading');
+    try {
+      const success = await saveTestConnectionDoc();
+      setTestStatus(success ? 'success' : 'failed');
+      onLogAction(`Menjalankan uji koneksi simpan dokumen test Firestore: ${success ? 'Berhasil' : 'Gagal'}`, "Pengaturan");
+    } catch (e) {
+      setTestStatus('failed');
+      onLogAction("Menjalankan uji koneksi simpan dokumen test Firestore: Gagal dengan exception", "Pengaturan");
+    }
+    setTimeout(() => setTestStatus('idle'), 4000);
+  };
+
   // Synchronize state when props update
   useEffect(() => {
     setFormProfile({ ...profile });
   }, [profile]);
+
+  useEffect(() => {
+    if (portalCredentials && Array.isArray(portalCredentials.credentials)) {
+      setCredentialsList(JSON.parse(JSON.stringify(portalCredentials.credentials)));
+    }
+  }, [portalCredentials]);
+
+  const handleEditCredField = (index: number, field: keyof PortalCredential, value: string) => {
+    setCredentialsList(prev => {
+      const next = [...prev];
+      next[index] = { ...next[index], [field]: value };
+      return next;
+    });
+  };
+
+  const handleDeleteCred = (index: number) => {
+    if (confirm("Apakah Anda yakin ingin menghapus kredensial portal untuk baris ini?")) {
+      const next = credentialsList.filter((_, i) => i !== index);
+      setCredentialsList(next);
+      onLogAction("Menghapus baris kredensial portal desa", "Pengaturan");
+    }
+  };
+
+  const handleCreateCred = () => {
+    if (newCredType === 'staf') {
+      if (!newCredName.trim()) {
+        alert("Nama Staf tidak boleh kosong.");
+        return;
+      }
+      if (!newCredPin.trim() || newCredPin.length < 4) {
+        alert("PIN Staf minimal 4 digit.");
+        return;
+      }
+      if (credentialsList.some(c => c.type === 'staf' && c.role === newCredRole)) {
+        alert(`Peran atau Portal ${newCredRole} sudah terdaftar. Silakan edit baris data yang sudah ada.`);
+        return;
+      }
+      const newItem: PortalCredential = {
+        type: 'staf',
+        role: newCredRole as any,
+        name: newCredName.trim(),
+        pin: newCredPin.trim()
+      };
+      setCredentialsList(prev => [...prev, newItem]);
+      onLogAction(`Menambahkan kredensial staf baru untuk peran ${newCredRole}`, "Pengaturan");
+    } else {
+      if (!newCredNik || newCredNik.length < 16) {
+        alert("NIK Warga harus berupa 16 digit angka.");
+        return;
+      }
+      if (!newCredName.trim()) {
+        alert("Nama Warga tidak boleh kosong.");
+        return;
+      }
+      if (!newCredPin.trim() || newCredPin.length < 4) {
+        alert("PIN Warga minimal 4 digit.");
+        return;
+      }
+      if (credentialsList.some(c => c.type === 'warga' && c.nik === newCredNik)) {
+        alert("NIK ini sudah terdaftar!");
+        return;
+      }
+      const newItem: PortalCredential = {
+        type: 'warga',
+        nik: newCredNik,
+        name: newCredName.trim(),
+        pin: newCredPin.trim()
+      };
+      setCredentialsList(prev => [...prev, newItem]);
+      onLogAction(`Menambahkan kredensial warga baru dengan NIK ${newCredNik}`, "Pengaturan");
+    }
+    // Reset additions form
+    setNewCredName('');
+    setNewCredNik('');
+    setNewCredPin('');
+  };
+
+  const handleSaveAllCredentials = () => {
+    for (const cred of credentialsList) {
+      if (!cred.name.trim()) {
+        alert("Semua nama tidak boleh kosong!");
+        return;
+      }
+      if (!cred.pin.trim() || cred.pin.length < 4) {
+        alert(`Sandi PIN untuk ${cred.name} minimal 4 digit!`);
+        return;
+      }
+      if (cred.type === 'warga') {
+        if (!cred.nik || cred.nik.length < 16) {
+          alert(`NIK warga ${cred.name} wajib berisi 16 digit.`);
+          return;
+        }
+      }
+    }
+    savePortalCredentials({ credentials: credentialsList });
+    onLogAction("Memperbarui konfigurası Sandi PIN & Kredensial seluruh Portal Desa", "Pengaturan");
+    alert("Pengaturan PIN Kredensial berhasil disinkronisasikan ke Cloud!");
+  };
 
   // Handle standard text inputs
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -516,7 +642,199 @@ export default function PengaturanView({
                 rows={3}
                 className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 font-sans focus:outline-none leading-relaxed"
                 placeholder="Tulis urutan sejarah terbentuknya dusun kependudukan..."
+                required
               />
+            </div>
+          </div>
+
+          {/* Section 4: Credential and PIN Manager */}
+          <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-4">
+            <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider font-mono border-b pb-2 flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <FileLock size={14} className="text-blue-500 animate-pulse" />
+                <span>4. Pengaturan Sandi PIN & Kredensial Login Portal</span>
+              </span>
+              <span className="text-[9px] text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100 font-bold uppercase">
+                Otoritas Super Admin ✓
+              </span>
+            </h3>
+
+            <p className="text-[10px] text-slate-400 font-mono leading-relaxed">
+              Atur dan regulasi Nama Sesuai Portal serta sandi PIN rahasia untuk masing-masing Staf (Kepala Desa, Bendahara, Sekretaris, RT/RW, Operator, Super Admin) dan akun Warga (NIK) secara langsung. Tekan tombol <strong>SINKRONISASI KREDENSIAL</strong> untuk menerapkan perubahan ke real-time database.
+            </p>
+
+            {/* List of current credentials */}
+            <div className="border border-slate-100 rounded-lg overflow-x-auto">
+              <table className="w-full text-[11px] text-left border-collapse font-sans">
+                <thead>
+                  <tr className="bg-slate-50 text-slate-400 border-b border-slate-150 uppercase text-[9px] font-bold font-mono tracking-wider">
+                    <th className="p-2.5">Tipe Portal</th>
+                    <th className="p-2.5">Keterangan / NIK</th>
+                    <th className="p-2.5">Nama Sesuai Portal (Username)</th>
+                    <th className="p-2.5">Sandi PIN Rahasia</th>
+                    <th className="p-2.5 text-center">Tindakan</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-slate-700">
+                  {credentialsList.map((cred, idx) => (
+                    <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
+                      <td className="p-2.5 whitespace-nowrap">
+                        <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase inline-block ${
+                          cred.type === 'staf' 
+                            ? 'bg-purple-50 text-purple-700 border border-purple-100' 
+                            : 'bg-blue-50 text-blue-700 border border-blue-100'
+                        }`}>
+                          {cred.type === 'staf' ? (cred.role || 'Staf') : 'Warga'}
+                        </span>
+                      </td>
+                      <td className="p-2.5 whitespace-nowrap font-mono text-slate-500">
+                        {cred.type === 'staf' ? (
+                          <span className="text-[10px] uppercase font-bold text-slate-400">ROLE PORTAL</span>
+                        ) : (
+                          <input
+                            type="text"
+                            maxLength={16}
+                            value={cred.nik || ''}
+                            onChange={(e) => handleEditCredField(idx, 'nik', e.target.value.replace(/\D/g, ''))}
+                            className="w-32 bg-slate-50 border border-slate-200 rounded px-1.5 py-0.5 font-mono text-[10.5px] focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          />
+                        )}
+                      </td>
+                      <td className="p-2.5">
+                        <input
+                          type="text"
+                          value={cred.name || ''}
+                          onChange={(e) => handleEditCredField(idx, 'name', e.target.value)}
+                          className="w-full bg-slate-50 border border-slate-200 rounded px-2 py-1 font-semibold text-slate-800 text-[11px] focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          placeholder="Nama lengkap sesuai portal"
+                        />
+                      </td>
+                      <td className="p-2.5">
+                        <input
+                          type="text"
+                          value={cred.pin || ''}
+                          onChange={(e) => handleEditCredField(idx, 'pin', e.target.value)}
+                          className="w-20 bg-slate-50 border border-slate-200 rounded px-2 py-1 font-mono text-[11px] text-center focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          placeholder="PIN"
+                        />
+                      </td>
+                      <td className="p-2.5 text-center">
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteCred(idx)}
+                          className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors"
+                          title="Hapus Kredensial"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  {credentialsList.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="p-6 text-center text-slate-400 font-mono italic text-[10px]">
+                        Belum ada data kredensial portal di database.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Form for adding new credentials */}
+            <div className="bg-slate-50 p-4 rounded-lg border border-slate-150 space-y-3">
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block font-mono">
+                ➕ Daftarkan Akun Portal Baru :
+              </span>
+
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-3.5">
+                <div className="md:col-span-3">
+                  <label className="block text-[9px] font-semibold text-slate-400 uppercase tracking-wider font-mono mb-1">Tipe Portal</label>
+                  <select
+                    value={newCredType}
+                    onChange={(e) => setNewCredType(e.target.value as 'staf' | 'warga')}
+                    className="w-full bg-white border border-slate-250 text-slate-800 text-[11px] rounded px-2 py-1.5 focus:outline-none"
+                  >
+                    <option value="warga">Warga (NIK)</option>
+                    <option value="staf">Aparat / Staf Desa</option>
+                  </select>
+                </div>
+
+                <div className="md:col-span-3">
+                  {newCredType === 'staf' ? (
+                    <>
+                      <label className="block text-[9px] font-semibold text-slate-400 uppercase tracking-wider font-mono mb-1">Peran / Role</label>
+                      <select
+                        value={newCredRole}
+                        onChange={(e) => setNewCredRole(e.target.value)}
+                        className="w-full bg-white border border-slate-250 text-slate-800 text-[11px] rounded px-2 py-1.5 focus:outline-none"
+                      >
+                        <option value="Operator">Operator</option>
+                        <option value="Kepala Desa">Kepala Desa</option>
+                        <option value="Sekretaris">Sekretaris</option>
+                        <option value="Bendahara">Bendahara</option>
+                        <option value="RT/RW">RT/RW</option>
+                        <option value="Super Admin">Super Admin</option>
+                      </select>
+                    </>
+                  ) : (
+                    <>
+                      <label className="block text-[9px] font-semibold text-slate-400 uppercase tracking-wider font-mono mb-1">NIK Warga (16 digit)</label>
+                      <input
+                        type="text"
+                        maxLength={16}
+                        value={newCredNik}
+                        onChange={(e) => setNewCredNik(e.target.value.replace(/\D/g, ''))}
+                        placeholder="Cth: 320412xxxxxxxxxx"
+                        className="w-full bg-white border border-slate-250 text-slate-800 text-[11px] rounded px-2 py-1.5 focus:outline-none font-mono"
+                      />
+                    </>
+                  )}
+                </div>
+
+                <div className="md:col-span-3">
+                  <label className="block text-[9px] font-semibold text-slate-400 uppercase tracking-wider font-mono mb-1">Nama Pengguna Sesuai Portal</label>
+                  <input
+                    type="text"
+                    value={newCredName}
+                    onChange={(e) => setNewCredName(e.target.value)}
+                    placeholder="Nama Lengkap"
+                    className="w-full bg-white border border-slate-250 text-slate-800 text-[11px] rounded px-2 py-1.5 focus:outline-none"
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="block text-[9px] font-semibold text-slate-400 uppercase tracking-wider font-mono mb-1">Sandi PIN</label>
+                  <input
+                    type="text"
+                    value={newCredPin}
+                    onChange={(e) => setNewCredPin(e.target.value)}
+                    placeholder="Cth: 123456"
+                    className="w-full bg-white border border-slate-250 text-slate-800 text-[11px] rounded px-2 py-1.5 focus:outline-none font-mono text-center"
+                  />
+                </div>
+
+                <div className="md:col-span-1 flex items-end">
+                  <button
+                    type="button"
+                    onClick={handleCreateCred}
+                    className="w-full py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded flex items-center justify-center gap-0.5 shadow transition-all"
+                  >
+                    <Plus size={14} />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-1">
+              <button
+                type="button"
+                onClick={handleSaveAllCredentials}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black rounded-lg flex items-center gap-1.5 shadow-md shadow-emerald-50/20 active:scale-95 transition-all font-mono uppercase"
+              >
+                <Save size={13} />
+                <span>Sinkronisasi Kredensial & Sandi PIN</span>
+              </button>
             </div>
           </div>
         </div>
@@ -589,8 +907,57 @@ export default function PengaturanView({
 
             {/* Signature view & change trigger */}
             <div className="flex flex-col items-center space-y-3">
+              {/* Format Tanda Tangan Selector */}
+              <div className="w-full space-y-2 border-b pb-3 border-slate-150">
+                <label className="block text-[10px] font-bold text-slate-500 uppercase font-mono tracking-wider leading-none mb-1">
+                  Format Tanda Tangan Kepala Desa
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setFormProfile(prev => ({ ...prev, signatureType: 'image' }))}
+                    className={`py-2 px-3 rounded-lg text-xs font-bold border transition-all flex items-center justify-center gap-2 ${
+                      formProfile.signatureType !== 'barcode'
+                        ? 'bg-blue-50 border-blue-200 text-blue-700 font-bold'
+                        : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    <span>✍️ Gores TTD Basah (Gambar)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFormProfile(prev => ({ ...prev, signatureType: 'barcode' }))}
+                    className={`py-2 px-3 rounded-lg text-xs font-bold border transition-all flex items-center justify-center gap-2 ${
+                      formProfile.signatureType === 'barcode'
+                        ? 'bg-blue-50 border-blue-200 text-blue-700 font-bold'
+                        : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    <span>📊 Barcode / QR Digital TTE</span>
+                  </button>
+                </div>
+                <p className="text-[9px] text-slate-400 font-mono leading-normal pt-1">
+                  {formProfile.signatureType === 'barcode'
+                    ? 'Kombinasi data keaslian tanda tangan kepala desa langsung dikonversi ke Barcode QR-Code E-Signature (TTE) anti pemalsuan.'
+                    : 'Menggunakan gambar coretan atau file scan tanda tangan fisik kepala desa secara langsung.'}
+                </p>
+              </div>
+
+              {/* Signature Preview Panel */}
               <div className="w-full h-28 bg-slate-50/70 border border-dashed border-slate-200 rounded-lg p-3 flex flex-col justify-center items-center overflow-hidden relative shadow-inner select-none">
-                {formProfile.signatureUrl ? (
+                {formProfile.signatureType === 'barcode' ? (
+                  <div className="flex flex-col items-center justify-center space-y-1">
+                    <img 
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=SMART_DESA_TTE_VERIFIED_${formProfile.kepalaDesa.replace(/\s+/g, '_')}`}
+                      alt="TTE Barcode Preview" 
+                      className="h-14 w-14 object-contain"
+                      referrerPolicy="no-referrer"
+                    />
+                    <span className="text-[8px] font-mono text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded font-bold border border-emerald-100 flex items-center gap-0.5 animate-pulse">
+                      🔒 TTE BARCODE SCANNER AKTIF
+                    </span>
+                  </div>
+                ) : formProfile.signatureUrl ? (
                   <img 
                     src={formProfile.signatureUrl} 
                     alt="Tanda Tangan Kades" 
@@ -600,8 +967,8 @@ export default function PengaturanView({
                 ) : (
                   <span className="text-[10px] text-slate-400 italic">Tanda tangan kosong. Upload atau gambar baru.</span>
                 )}
-                <div className="absolute top-1.5 right-1.5 px-2 py-0.5 bg-white border rounded text-[8px] font-mono text-slate-400 uppercase font-black tracking-wider leading-none">
-                  TTD Aktif
+                <div className="absolute top-1.5 right-1.5 px-2 py-0.5 bg-white border rounded text-[8px] font-mono text-slate-400 uppercase font-bold tracking-wider leading-none">
+                  Status TTD
                 </div>
               </div>
 
@@ -707,6 +1074,34 @@ export default function PengaturanView({
             </span>
             <p className="text-[9.5px] text-slate-500 font-mono leading-tight">Seluruh perubahan yang disimpan akan langsung diinjeksikan secara real-time ke dalam KOP surat dinas resmi, berkas kependudukan, buku APBDes, dan portal publik.</p>
             
+            <div className="pt-1.5 border-t border-slate-200/60 pb-1">
+              <button
+                type="button"
+                onClick={handleTestConnection}
+                disabled={testStatus === 'loading'}
+                className={`w-full py-2 px-3 border rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+                  testStatus === 'loading'
+                    ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
+                    : testStatus === 'success'
+                    ? 'bg-emerald-50 border-emerald-300 text-emerald-700 shadow-sm shadow-emerald-100'
+                    : testStatus === 'failed'
+                    ? 'bg-rose-50 border-rose-300 text-rose-700 shadow-sm shadow-rose-100'
+                    : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-700 hover:text-slate-900 active:scale-95 shadow-sm cursor-pointer'
+                }`}
+              >
+                <RefreshCw size={12} className={`${testStatus === 'loading' ? 'animate-spin' : ''}`} />
+                <span>
+                  {testStatus === 'loading'
+                    ? 'Menghubungkan ke Cloud...'
+                    : testStatus === 'success'
+                    ? 'Uji Koneksi Firestore: BERHASIL ✔'
+                    : testStatus === 'failed'
+                    ? 'Koneksi Gagal (Periksa Aturan/Sinyal) ❌'
+                    : 'Uji Koneksi Simpan Dokumen Cloud'}
+                </span>
+              </button>
+            </div>
+
             <button
               type="submit"
               id="sett-save-all-btn"

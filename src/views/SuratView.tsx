@@ -281,7 +281,12 @@ export default function SuratView({
               <p style="font-weight: bold;">KEPALA ${villageProfile.name.toUpperCase()}</p>
               ${letItem.status === 'Selesai' ? `
                 <div style="margin: 5px 0; min-height: 60px; display: flex; align-items: center; justify-content: center;">
-                  ${villageProfile.signatureUrl ? `
+                  ${villageProfile.signatureType === 'barcode' ? `
+                    <div style="text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+                      <img src="https://api.qrserver.com/v1/create-qr-code/?size=90x90&data=SMART_DESA_SIGNED_BY_KADES_${villageProfile.kepalaDesa.replace(/\s+/g, '_')}_LETTER_ID_${letItem.id}" style="max-height: 65px; max-width: 65px; margin: 2px 0; border: 1px solid #ddd; padding: 2px;" alt="TTE Kades QR"/>
+                      <span style="font-size: 7.5px; color: #2e7d32; font-family: monospace; font-weight: bold; display: block; margin-top: 1px;">✓ TTE KADES VALID</span>
+                    </div>
+                  ` : villageProfile.signatureUrl ? `
                     <img src="${villageProfile.signatureUrl}" style="max-height: 60px; max-width: 150px; object-fit: contain;" alt="Tanda Tangan Kades"/>
                   ` : `
                     <span style="border: 2px dashed blue; color: blue; padding: 4px 10px; font-size: 11px; font-weight: bold; font-family: sans-serif;">🔒 SIGNED DIGITAL</span>
@@ -294,11 +299,55 @@ export default function SuratView({
               `}
             </div>
           </div>
+
+          <script>
+            window.addEventListener('load', function() {
+              var images = Array.from(document.images);
+              var loadedCount = 0;
+              
+              function triggerPrint() {
+                setTimeout(function() {
+                  window.print();
+                }, 500);
+              }
+              
+              if (images.length === 0) {
+                triggerPrint();
+                return;
+              }
+              
+              var safetyTimeout = setTimeout(triggerPrint, 2500);
+              
+              images.forEach(function(img) {
+                if (img.complete) {
+                  loadedCount++;
+                  if (loadedCount === images.length) {
+                    clearTimeout(safetyTimeout);
+                    triggerPrint();
+                  }
+                } else {
+                  img.addEventListener('load', function() {
+                    loadedCount++;
+                    if (loadedCount === images.length) {
+                      clearTimeout(safetyTimeout);
+                      triggerPrint();
+                    }
+                  });
+                  img.addEventListener('error', function() {
+                    loadedCount++;
+                    if (loadedCount === images.length) {
+                      clearTimeout(safetyTimeout);
+                      triggerPrint();
+                    }
+                  });
+                }
+              });
+            });
+          </script>
         </body>
       </html>
     `);
     printWindow.document.close();
-    printWindow.print();
   };
 
   // Filter letters based on query and tabs

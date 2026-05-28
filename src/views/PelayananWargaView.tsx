@@ -12,7 +12,7 @@ import {
   TrendingDown,
   Navigation
 } from 'lucide-react';
-import { Resident, Letter, CitizenComplaint } from '../types';
+import { Resident, Letter, CitizenComplaint, Role } from '../types';
 
 interface PelayananWargaViewProps {
   residents: Resident[];
@@ -20,6 +20,7 @@ interface PelayananWargaViewProps {
   complaints: CitizenComplaint[];
   onNavigate: (view: string) => void;
   openAiAssistant: () => void;
+  currentUser?: { name: string; role: Role; nik?: string } | null;
 }
 
 export default function PelayananWargaView({
@@ -27,11 +28,12 @@ export default function PelayananWargaView({
   letters,
   complaints,
   onNavigate,
-  openAiAssistant
+  openAiAssistant,
+  currentUser
 }: PelayananWargaViewProps) {
   
-  // Let's assume the simulated target logged-in citizen is 'Ahmad Sopian' (NIK: 3204101201930005)
-  const citizenNik = '3204101201930005';
+  // Resolve citizen's actual authenticated NIK, defaulting to mock user if not specified
+  const citizenNik = currentUser?.nik || '3204101201930005';
   const myResidentInfo = residents.find(r => r.nik === citizenNik) || residents[0];
 
   // Specific filtered letters / complaints for this citizen

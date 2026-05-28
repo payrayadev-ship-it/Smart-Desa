@@ -19,7 +19,11 @@ import {
   Copy,
   Check
 } from 'lucide-react';
-import { Role, VillageProfile } from '../types';
+import { onSnapshot, doc, setDoc } from 'firebase/firestore';
+import { signInAnonymously } from 'firebase/auth';
+import { db, auth } from '../firebase';
+import { LocalDb, INITIAL_PORTAL_CREDENTIALS } from '../mockData';
+import { Role, VillageProfile, PortalCredential } from '../types';
 
 interface LoginViewProps {
   onLoginSuccess: (user: { name: string; role: Role; nik?: string }) => void;
@@ -50,7 +54,12 @@ export default function LoginView({ onLoginSuccess, villageProfile }: LoginViewP
   const isStrictStaff = queryParams?.get('portal') === 'staf' || queryParams?.get('portal') === 'staff' || queryParams?.get('portal') === 'aparat';
   const currentTab = isStrictWarga ? 'warga' : isStrictStaff ? 'staff' : activeTab;
 
+  const [portalCredentials, setPortalCredentials] = useState<{ credentials: PortalCredential[] }>(() => {
+    return LocalDb.getPortalCredentials();
+  });
+
   const [selectedStaffRole, setSelectedStaffRole] = useState<Role>('Operator');
+  const [staffNameInput, setStaffNameInput] = useState('');
   const [nik, setNik] = useState('');
   const [pin, setPin] = useState('');
   const [showPin, setShowPin] = useState(false);
@@ -58,6 +67,65 @@ export default function LoginView({ onLoginSuccess, villageProfile }: LoginViewP
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [successAnimation, setSuccessAnimation] = useState(false);
   const [copiedType, setCopiedType] = useState<'warga' | 'staf' | null>(null);
+
+  // Authenticate anonymously and subscribe to portalCredentials from Firestore
+  useEffect(() => {
+    const initAuthAndSubscribe = async () => {
+      let authSuccessful = false;
+      try {
+        if (!auth.currentUser) {
+          await signInAnonymously(auth);
+        }
+        authSuccessful = true;
+      } catch (e) {
+        console.warn("Silent anonymous authenticate on mount failed, running in local database fallback mode:", e);
+      }
+
+      if (!authSuccessful && !auth.currentUser) {
+        console.warn("Firebase Auth bypassed or restricted. Running LoginView on local credentials fallback.");
+        return;
+      }
+
+      try {
+        const unsub = onSnapshot(doc(db, 'settings', 'portalCredentials'), (snapshot) => {
+          if (snapshot.exists()) {
+            const data = snapshot.data() as { credentials: PortalCredential[] };
+            if (data && Array.isArray(data.credentials)) {
+              setPortalCredentials(data);
+              LocalDb.savePortalCredentials(data);
+            }
+          } else {
+            // Seed documents if doesn't exist
+            setDoc(doc(db, 'settings', 'portalCredentials'), INITIAL_PORTAL_CREDENTIALS).catch(e => {
+              console.warn("Seeding initial portal credentials to Firestore failed:", e);
+            });
+          }
+        }, (err) => {
+          console.warn("Credentials subscription failed, falling back to local database:", err);
+        });
+        return unsub;
+      } catch (err) {
+        console.warn("Setup subscription error:", err);
+      }
+    };
+
+    let unsubFn: (() => void) | undefined;
+    initAuthAndSubscribe().then(unsub => {
+      if (unsub) unsubFn = unsub;
+    });
+
+    return () => {
+      if (unsubFn) unsubFn();
+    };
+  }, []);
+
+  // Sync typed name when role is chosen if empty
+  useEffect(() => {
+    const cred = portalCredentials.credentials.find(c => c.type === 'staf' && c.role === selectedStaffRole);
+    if (cred && !staffNameInput) {
+      setStaffNameInput(cred.name);
+    }
+  }, [portalCredentials, selectedStaffRole]);
 
   // Synchronize tab if search param changes
   useEffect(() => {
@@ -108,14 +176,14 @@ export default function LoginView({ onLoginSuccess, villageProfile }: LoginViewP
     }
   };
 
-  // Demo account quick switch values
+  // Switch labels and default options
   const STAFF_DEMOS = [
-    { role: 'Operator' as Role, name: 'Budi Santoso', desc: 'Petugas Input & Pelayanan' },
-    { role: 'Kepala Desa' as Role, name: 'H. Dadang Sulaeman, S.IP.', desc: 'Pemberi Tanda Tangan' },
-    { role: 'Sekretaris' as Role, name: 'Ahmad Fauzi, S.Kom.', desc: 'Verifikator Berkas & RT' },
-    { role: 'Bendahara' as Role, name: 'Siti Rahmawati, A.Md.', desc: 'Otorisator APBDes' },
-    { role: 'RT/RW' as Role, name: 'Bpk. Yanto (RT)', desc: 'Pengurus Lingkungan 02/05' },
-    { role: 'Super Admin' as Role, name: 'Admin Utama', desc: 'Kendali Penuh Sistem' }
+    { role: 'Operator' as Role, desc: 'Petugas Input & Pelayanan' },
+    { role: 'Kepala Desa' as Role, desc: 'Pemberi Tanda Tangan' },
+    { role: 'Sekretaris' as Role, desc: 'Verifikator Berkas & RT' },
+    { role: 'Bendahara' as Role, desc: 'Otorisator APBDes' },
+    { role: 'RT/RW' as Role, desc: 'Pengurus Lingkungan 02/05' },
+    { role: 'Super Admin' as Role, desc: 'Kendali Penuh Sistem' }
   ];
 
   const CITIZEN_DEMOS = [
@@ -128,28 +196,39 @@ export default function LoginView({ onLoginSuccess, villageProfile }: LoginViewP
     e.preventDefault();
     setErrorMsg(null);
 
+    const trimmedName = staffNameInput.trim();
+    if (!trimmedName) {
+      playLoginSound('error');
+      setErrorMsg("Nama Sesuai Portal tidak boleh kosong.");
+      return;
+    }
+
     if (!pin) {
       playLoginSound('error');
-      setErrorMsg("Sandi PIN tidak boleh kosong (Demo PIN default: 123456)");
+      setErrorMsg("Sandi PIN tidak boleh kosong.");
       return;
     }
 
-    if (pin !== '123456') {
+    // Match typed name and pin
+    const matchedCred = portalCredentials.credentials.find(
+      c => c.type === 'staf' &&
+           c.name.toLowerCase() === trimmedName.toLowerCase() &&
+           c.pin === pin
+    );
+
+    if (!matchedCred) {
       playLoginSound('error');
-      setErrorMsg("Sandi PIN salah! Silakan gunakan PIN Demo default: 123456");
+      setErrorMsg("Nama Sesuai Portal atau Sandi PIN salah! Silakan gunakan tombol Testing Instant atau hubungi Super Admin.");
       return;
     }
-
-    const matchedStaff = STAFF_DEMOS.find(s => s.role === selectedStaffRole);
-    const staffName = matchedStaff ? matchedStaff.name : `Petugas ${selectedStaffRole}`;
 
     // Success login sequence
     playLoginSound('success');
     setSuccessAnimation(true);
     setTimeout(() => {
       onLoginSuccess({
-        name: staffName,
-        role: selectedStaffRole
+        name: matchedCred.name,
+        role: matchedCred.role || 'Operator'
       });
     }, 1200);
   };
@@ -158,7 +237,8 @@ export default function LoginView({ onLoginSuccess, villageProfile }: LoginViewP
     e.preventDefault();
     setErrorMsg(null);
 
-    if (!nik || nik.length < 16) {
+    const cleanNik = nik.trim();
+    if (!cleanNik || cleanNik.length < 16) {
       playLoginSound('error');
       setErrorMsg("Silakan masukkan 16 Digit NIK terdaftar di sistem.");
       return;
@@ -166,27 +246,27 @@ export default function LoginView({ onLoginSuccess, villageProfile }: LoginViewP
 
     if (!pin) {
       playLoginSound('error');
-      setErrorMsg("Kata sandi / PIN tidak boleh kosong");
+      setErrorMsg("Kata PIN tidak boleh kosong.");
       return;
     }
 
-    if (pin !== '123456') {
+    const matchedCred = portalCredentials.credentials.find(
+      c => c.type === 'warga' && c.nik === cleanNik && c.pin === pin
+    );
+
+    if (!matchedCred) {
       playLoginSound('error');
-      setErrorMsg("Kata PIN salah. Gunakan PIN Demo default: 123456");
+      setErrorMsg("Sandi PIN salah atau NIK belum didaftarkan di sistem!");
       return;
     }
-
-    // Try to match NIK
-    const matchedCitizen = CITIZEN_DEMOS.find(c => c.nik === nik);
-    const citizenName = matchedCitizen ? matchedCitizen.name : 'Ahmad Sopian (Warga)';
 
     playLoginSound('success');
     setSuccessAnimation(true);
     setTimeout(() => {
       onLoginSuccess({
-        name: citizenName,
+        name: matchedCred.name,
         role: 'Masyarakat',
-        nik: nik
+        nik: cleanNik
       });
     }, 1200);
   };
@@ -194,14 +274,26 @@ export default function LoginView({ onLoginSuccess, villageProfile }: LoginViewP
   const handleQuickStaffSelect = (role: Role) => {
     playLoginSound('click');
     setSelectedStaffRole(role);
-    setPin('123456');
+    const cred = portalCredentials.credentials.find(c => c.type === 'staf' && c.role === role);
+    if (cred) {
+      setStaffNameInput(cred.name);
+      setPin(cred.pin);
+    } else {
+      setStaffNameInput('');
+      setPin('');
+    }
     setErrorMsg(null);
   };
 
   const handleQuickWargaSelect = (selectedNik: string) => {
     playLoginSound('click');
     setNik(selectedNik);
-    setPin('123456');
+    const cred = portalCredentials.credentials.find(c => c.type === 'warga' && c.nik === selectedNik);
+    if (cred) {
+      setPin(cred.pin);
+    } else {
+      setPin('123456');
+    }
     setErrorMsg(null);
   };
 
@@ -434,25 +526,47 @@ export default function LoginView({ onLoginSuccess, villageProfile }: LoginViewP
               {/* TAB 1: APARAT/STAFF AUTH */}
               {currentTab === 'staff' && (
                 <form onSubmit={handleStaffLogin} className="space-y-4">
-                  <div className="grid grid-cols-2 gap-2">
-                    <label className="col-span-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono">
-                      PILIH PERAN ADMINISTRATOR / STAF DESA :
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 font-mono">
+                      NAMA LENGKAP APARAT (Sesuai Portal Masing-masing)* :
+                    </label>
+                    <div className="relative">
+                      <User size={14} className="absolute left-3.5 top-3.5 text-slate-500" />
+                      <input
+                        type="text"
+                        value={staffNameInput}
+                        onChange={(e) => setStaffNameInput(e.target.value)}
+                        placeholder="Ketik Nama Lengkap Anda (cth: Budi Santoso)"
+                        className="w-full bg-slate-950 border border-slate-800 text-white placeholder-slate-600 rounded-xl pl-9 py-3 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 font-semibold"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 font-mono">
+                      PORTAL UTAMA AKSES DESA :
                     </label>
                     <select
                       value={selectedStaffRole}
                       onChange={(e) => {
                         playLoginSound('click');
-                        setSelectedStaffRole(e.target.value as Role);
+                        const newRole = e.target.value as Role;
+                        setSelectedStaffRole(newRole);
+                        const cred = portalCredentials.credentials.find(c => c.type === 'staf' && c.role === newRole);
+                        if (cred) {
+                          setStaffNameInput(cred.name);
+                        }
                         setErrorMsg(null);
                       }}
-                      className="col-span-2 bg-slate-950 text-white border border-slate-800 rounded-xl px-3 py-2.5 text-xs focus:ring-1 focus:ring-blue-500 font-semibold focus:outline-none"
+                      className="w-full bg-slate-950 text-white border border-slate-800 rounded-xl px-3 py-2.5 text-xs focus:ring-1 focus:ring-blue-500 font-semibold focus:outline-none"
                     >
-                      <option value="Operator">Operator Desa (Budi Santoso)</option>
-                      <option value="Kepala Desa">Kepala Desa (H. Dadang Sulaeman, S.IP.)</option>
-                      <option value="Sekretaris">Sekretaris Desa (Ahmad Fauzi, S.Kom.)</option>
-                      <option value="Bendahara">Bendahara Desa (Siti Rahmawati, A.Md.)</option>
-                      <option value="RT/RW">Ketua RT 02 / RW 05 (Bpk. Yanto)</option>
-                      <option value="Super Admin">Super Administrator (Developer Kedaulatan)</option>
+                      <option value="Operator">Operator Desa (Arsip & Input)</option>
+                      <option value="Kepala Desa">Kepala Desa (Verifikator Akhir)</option>
+                      <option value="Sekretaris">Sekretaris Desa (Verifikator Berkas)</option>
+                      <option value="Bendahara">Bendahara Desa (Otorisator Keuangan)</option>
+                      <option value="RT/RW">Ketua RT / RW (Kewilayahan)</option>
+                      <option value="Super Admin">Super Admin (Pengendali Menyeluruh)</option>
                     </select>
                   </div>
 
@@ -466,8 +580,9 @@ export default function LoginView({ onLoginSuccess, villageProfile }: LoginViewP
                         type={showPin ? 'text' : 'password'}
                         value={pin}
                         onChange={(e) => setPin(e.target.value)}
-                        placeholder="Masukkan PIN Akses (Demo PIN: 123456)"
+                        placeholder="Masukkan PIN Sandi"
                         className="w-full bg-slate-950 border border-slate-800 text-white placeholder-slate-650 rounded-xl pl-9 pr-10 py-3 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 font-semibold"
+                        required
                       />
                       <button
                         type="button"
@@ -482,11 +597,13 @@ export default function LoginView({ onLoginSuccess, villageProfile }: LoginViewP
                   {/* QUICK STAFF DEMO SWITCH BOARD */}
                   <div className="bg-slate-950 p-3 rounded-xl border border-slate-800/50 space-y-2">
                     <span className="text-[8.5px] font-mono text-blue-400 uppercase tracking-wider block font-bold">
-                      ⚡ TESTING INSTANT (klik salah satu akun untuk auto-fill & set PIN):
+                      ⚡ TESTING INSTANT (klik salah satu akun untuk auto-fill nama & PIN dari database):
                     </span>
                     <div className="grid grid-cols-2 gap-1.5">
                       {STAFF_DEMOS.map(s => {
                         const isChosen = selectedStaffRole === s.role;
+                        const cred = portalCredentials.credentials.find(c => c.type === 'staf' && c.role === s.role);
+                        const currentName = cred ? cred.name : 'Belum Diatur';
                         return (
                           <button
                             key={s.role}
@@ -499,7 +616,7 @@ export default function LoginView({ onLoginSuccess, villageProfile }: LoginViewP
                             }`}
                           >
                             <div className="text-[9px] uppercase font-mono font-bold tracking-wide truncate">{s.role}</div>
-                            <div className="text-[8px] text-slate-500 truncate mt-0.5">{s.name}</div>
+                            <div className="text-[8px] text-slate-500 truncate mt-0.5">{currentName}</div>
                           </button>
                         );
                       })}
@@ -510,7 +627,7 @@ export default function LoginView({ onLoginSuccess, villageProfile }: LoginViewP
                     type="submit"
                     className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-md uppercase font-mono tracking-wide"
                   >
-                    <span>Masuk Hub Administrasi</span>
+                    <span>Masuk Hub Administrasi Desa</span>
                     <ArrowRight size={13} />
                   </button>
                 </form>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   AlertTriangle, 
   Search, 
@@ -20,24 +20,38 @@ interface PengaduanViewProps {
   saveComplaints: (data: CitizenComplaint[]) => void;
   activeRole: Role;
   onLogAction: (action: string, module: string) => void;
+  currentUser?: { name: string; role: Role; nik?: string } | null;
 }
 
 export default function PengaduanView({
   complaints: initialComplaints,
   saveComplaints,
   activeRole,
-  onLogAction
+  onLogAction,
+  currentUser
 }: PengaduanViewProps) {
   const [complaints, setComplaints] = useState<CitizenComplaint[]>(initialComplaints);
   const [search, setSearch] = useState('');
   const [filterCategory, setFilterCategory] = useState('Semua');
+
+  // Synchronize local state with live database updates from Firestore
+  useEffect(() => {
+    setComplaints(initialComplaints);
+  }, [initialComplaints]);
 
   // New Complaint state
   const [showForm, setShowForm] = useState(false);
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState('Infrastruktur');
   const [description, setDescription] = useState('');
-  const [residentNik, setResidentNik] = useState('');
+  const [residentNik, setResidentNik] = useState(currentUser?.nik || '');
+
+  // Keep resident NIK in sync if the current user object changes
+  useEffect(() => {
+    if (currentUser?.nik) {
+      setResidentNik(currentUser.nik);
+    }
+  }, [currentUser]);
   
   // AI assistant dynamic states inside Complaint View
   const [aiDraftId, setAiDraftId] = useState<string | null>(null);

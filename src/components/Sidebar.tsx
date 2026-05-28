@@ -134,27 +134,36 @@ export default function Sidebar({ currentView, setView, activeRole, setActiveRol
                 <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse shrink-0"></span>
                 <span>MASYARAKAT MANDIRI</span>
               </div>
+            ) : activeRole === 'Super Admin' ? (
+              <div className="w-full text-xs bg-purple-950/40 border border-purple-900/60 text-purple-400 rounded-lg p-2.5 font-bold flex items-center gap-1.5 uppercase tracking-wider font-mono">
+                <span className="w-2 h-2 rounded-full bg-purple-500 animate-pulse shrink-0"></span>
+                <span>SUPER ADMINISTRATOR</span>
+              </div>
+            ) : activeRole === 'Kepala Desa' ? (
+              <div className="w-full text-xs bg-amber-950/30 border border-amber-900/60 text-amber-500 rounded-lg p-2.5 font-bold flex items-center gap-1.5 uppercase tracking-wider font-mono">
+                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse shrink-0"></span>
+                <span>KEPALA DESA</span>
+              </div>
+            ) : activeRole === 'Sekretaris' ? (
+              <div className="w-full text-xs bg-emerald-950/30 border border-emerald-900/60 text-emerald-400 rounded-lg p-2.5 font-bold flex items-center gap-1.5 uppercase tracking-wider font-mono">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
+                <span>SEKRETARIS DESA</span>
+              </div>
+            ) : activeRole === 'Bendahara' ? (
+              <div className="w-full text-xs bg-rose-950/30 border border-rose-900/60 text-rose-400 rounded-lg p-2.5 font-bold flex items-center gap-1.5 uppercase tracking-wider font-mono">
+                <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse shrink-0"></span>
+                <span>BENDAHARA DESA</span>
+              </div>
+            ) : activeRole === 'RT/RW' ? (
+              <div className="w-full text-xs bg-teal-950/30 border border-teal-900/60 text-teal-400 rounded-lg p-2.5 font-bold flex items-center gap-1.5 uppercase tracking-wider font-mono">
+                <span className="w-2 h-2 rounded-full bg-teal-500 animate-pulse shrink-0"></span>
+                <span>KETUA RT / RW</span>
+              </div>
             ) : (
-              <select
-                id="role-switcher-select"
-                value={activeRole}
-                onChange={(e) => {
-                  const targetRole = e.target.value as Role;
-                  setActiveRole(targetRole);
-                  if (targetRole === 'Masyarakat') {
-                    setView('pelayanan-warga');
-                  } else if (targetRole === 'RT/RW') {
-                    setView('rtrw');
-                  } else {
-                    setView('dashboard');
-                  }
-                }}
-                className="w-full text-xs bg-slate-800 text-white rounded-lg p-2.5 font-medium border border-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500"
-              >
-                {rolesList.filter(role => role !== 'Masyarakat').map((role) => (
-                  <option key={role} value={role}>{role}</option>
-                ))}
-              </select>
+              <div className="w-full text-xs bg-slate-800 border border-slate-700 text-slate-300 rounded-lg p-2.5 font-bold flex items-center gap-1.5 uppercase tracking-wider font-mono font-bold">
+                <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse shrink-0"></span>
+                <span>OPERATOR SIPIL</span>
+              </div>
             )}
           </div>
         ) : (

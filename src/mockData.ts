@@ -1,4 +1,4 @@
-import { Resident, Letter, FinanceTransaction, SocialAssistance, VillageAsset, Complaint, VillageAnnouncement, VillageAgenda, RtRwFinance, AuditLog, VillageProfile } from './types';
+import { Resident, Letter, FinanceTransaction, SocialAssistance, VillageAsset, Complaint, VillageAnnouncement, VillageAgenda, RtRwFinance, AuditLog, VillageProfile, PortalCredential } from './types';
 
 export const INITIAL_VILLAGE_PROFILE: VillageProfile = {
   name: "Desa Sukamaju",
@@ -21,7 +21,8 @@ export const INITIAL_VILLAGE_PROFILE: VillageProfile = {
     "Mendorong potensi ekonomi lokal melalui digitalisasi UMKM Desa dan BUMDes Sukamaju Utama.",
     "Mengoptimalkan penyaluran ketahanan pangan dan bantuan sosial adil menggunakan verifikasi data AI."
   ],
-  signatureUrl: "https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?auto=format&fit=crop&q=80&w=150"
+  signatureUrl: "https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?auto=format&fit=crop&q=80&w=150",
+  signatureType: "image"
 };
 
 // Initial realistic residents data
@@ -644,4 +645,21 @@ export class LocalDb {
 
   static getVillageProfile() { return getInitialData<VillageProfile>('village_profile', INITIAL_VILLAGE_PROFILE); }
   static saveVillageProfile(data: VillageProfile) { saveData('village_profile', data); }
+
+  static getPortalCredentials() { return getInitialData<{ credentials: PortalCredential[] }>('portal_credentials', INITIAL_PORTAL_CREDENTIALS); }
+  static savePortalCredentials(data: { credentials: PortalCredential[] }) { saveData('portal_credentials', data); }
 }
+
+export const INITIAL_PORTAL_CREDENTIALS: { credentials: PortalCredential[] } = {
+  credentials: [
+    { type: 'staf', role: 'Super Admin', name: 'Admin Utama', pin: '123456' },
+    { type: 'staf', role: 'Operator', name: 'Budi Santoso', pin: '123456' },
+    { type: 'staf', role: 'Kepala Desa', name: 'H. Dadang Sulaeman, S.IP.', pin: '123456' },
+    { type: 'staf', role: 'Sekretaris', name: 'Ahmad Fauzi, S.Kom.', pin: '101010' },
+    { type: 'staf', role: 'Bendahara', name: 'Siti Rahmawati, A.Md.', pin: '202020' },
+    { type: 'staf', role: 'RT/RW', name: 'Bpk. Yanto (RT)', pin: '020502' },
+    { type: 'warga', nik: '3204121208850001', name: 'Herman Kartomi', pin: '123456' },
+    { type: 'warga', nik: '3204124311890002', name: 'Anisa Rahmawati', pin: '123456' },
+    { type: 'warga', nik: '3204120302550008', name: 'Slamet Rahardja', pin: '123456' }
+  ]
+};

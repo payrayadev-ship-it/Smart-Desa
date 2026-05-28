@@ -24,6 +24,7 @@ export interface VillageProfile {
   visi: string;
   misi: string[];
   signatureUrl?: string;
+  signatureType?: 'image' | 'barcode';
 }
 
 export interface User {
@@ -200,6 +201,14 @@ export interface AuditLog {
   action: string;
   module: string;
   timestamp: string;
+}
+
+export interface PortalCredential {
+  type: 'staf' | 'warga';
+  role?: Role;
+  name: string;
+  nik?: string;
+  pin: string;
 }
 
 export type CitizenComplaint = Complaint;

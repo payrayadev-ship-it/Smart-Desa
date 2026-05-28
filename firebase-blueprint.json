@@ -175,6 +175,14 @@
     "/auditLogs/{logId}": {
       "schema": "AuditLog",
       "description": "Collection of operational trace audit activity event logs"
+    },
+    "/settings/{settingId}": {
+      "schema": "object",
+      "description": "Village profile settings configuration document"
+    },
+    "/test/{testId}": {
+      "schema": "object",
+      "description": "Collection used for checking connectivity read and write permissions"
     }
   }
 }

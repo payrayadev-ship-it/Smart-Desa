@@ -55,15 +55,19 @@ service cloud.firestore {
     match /users/{userId} {
       allow get: if isSignedIn() && (isOwner(userId) || isStaff());
       allow list: if isStaff();
-      allow create: if isSignedIn() && isOwner(userId) && 
-        request.resource.data.keys().hasAll(['uid', 'name', 'role']) &&
-        request.resource.data.role == "Masyarakat"; // Citizens can register themselves with "Masyarakat" role to prevent self-assigned admin privileges
-      
-      allow update: if isSignedIn() && isOwner(userId) && 
-        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'uid', 'nik']) &&
-        request.resource.data.name is string && request.resource.data.name.size() <= 100;
-        
+      allow create, update: if isSignedIn() && isOwner(userId);
       allow delete: if isStaff() && getUserData().role == "Super Admin";
+    }
+
+    // SETTINGS COLLECTION
+    match /settings/{settingId} {
+      allow read: if isSignedIn();
+      allow write: if isStaff();
+    }
+
+    // TEST CONNECTION COLLECTION
+    match /test/{testId} {
+      allow read, write: if isSignedIn();
     }
 
     // RESIDENTS COLLECTION

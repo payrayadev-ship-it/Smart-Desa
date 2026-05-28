@@ -165,14 +165,69 @@ export default function KependudukanView({
     setFormSuccess('');
   };
 
+  const getNikValidationStatus = () => {
+    if (!nik) {
+      return {
+        message: 'NIK wajib diisi (16 digit).',
+        status: 'idle',
+        className: 'text-slate-500'
+      };
+    }
+    if (/\D/.test(nik)) {
+      return {
+        message: 'NIK hanya boleh berisi karakter angka saja.',
+        status: 'error',
+        className: 'text-rose-600 font-bold'
+      };
+    }
+    if (nik.length < 16) {
+      return {
+        message: `NIK belum lengkap: ${nik.length} / 16 digit.`,
+        status: 'warning',
+        className: 'text-amber-600 font-medium'
+      };
+    }
+    if (nik.length > 16) {
+      return {
+        message: 'NIK tidak boleh lebih dari 16 digit.',
+        status: 'error',
+        className: 'text-rose-600 font-bold'
+      };
+    }
+    
+    const isDuplicate = residents.some(r => r.nik === nik && (!editingResident || r.id !== editingResident.id));
+    if (isDuplicate) {
+      return {
+        message: '⚠️ NIK ini sudah terdaftar pada basis data!',
+        status: 'error',
+        className: 'text-rose-600 font-bold'
+      };
+    }
+    
+    return {
+      message: '✔ NIK Format Valid & Tersedia',
+      status: 'success',
+      className: 'text-emerald-600 font-semibold'
+    };
+  };
+
   // Handle Form Submission
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setFormError('');
     setFormSuccess('');
 
-    if (nik.length !== 16 || noKK.length !== 16) {
-      setFormError('Nomor NIK dan KK wajib terdiri dari 16 karakter angka.');
+    const validation = getNikValidationStatus();
+    if (validation.status === 'error') {
+      setFormError(validation.message);
+      return;
+    }
+    if (validation.status === 'warning') {
+      setFormError('Nomor NIK belum lengkap (harus tepat 16 digit angka).');
+      return;
+    }
+    if (noKK.length !== 16) {
+      setFormError('Nomor KK harus tepat 16 digit angka.');
       return;
     }
     if (!nama.trim()) {
@@ -309,7 +364,14 @@ export default function KependudukanView({
           <div style="margin-top: 40px; text-align: right; float: right; width: 250px;">
             <p>Mengetahui,</p>
             <p style="margin-bottom: 5px;">Kepala ${villageProfile?.name || 'Desa Sukamaju'}</p>
-            ${villageProfile?.signatureUrl ? `
+            ${villageProfile?.signatureType === 'barcode' ? `
+              <div style="height: 65px; display: flex; align-items: center; justify-content: flex-end; margin: 5px 0;">
+                <div style="text-align: center; display: flex; flex-direction: column; align-items: center;">
+                  <img src="https://api.qrserver.com/v1/create-qr-code/?size=90x90&data=SMART_DESA_SIGNED_BY_KADES_${(villageProfile?.kepalaDesa || 'DADANG_SULAEMAN').replace(/\s+/g, '_')}_REPORT_KEPENDUDUKAN" style="max-height: 55px; max-width: 55px; border: 1px solid #ddd; padding: 1px;" alt="TTE Kades QR"/>
+                  <span style="font-size: 7px; color: #2e7d32; font-family: monospace; font-weight: bold; display: block; margin-top: 1px;">✓ TTE KADES VALID</span>
+                </div>
+              </div>
+            ` : villageProfile?.signatureUrl ? `
               <div style="height: 55px; display: flex; align-items: center; justify-content: flex-end; margin: 5px 0;">
                 <img src="${villageProfile.signatureUrl}" style="max-height: 55px; max-width: 150px; object-fit: contain;" alt="TTD Kades"/>
               </div>
@@ -317,11 +379,55 @@ export default function KependudukanView({
             <p style="font-weight: bold; text-decoration: underline; margin-top: 5px;">${villageProfile?.kepalaDesa || 'H. Dadang Sulaeman, S.IP.'}</p>
           </div>
           <div style="clear: both;"></div>
+
+          <script>
+            window.addEventListener('load', function() {
+              var images = Array.from(document.images);
+              var loadedCount = 0;
+              
+              function triggerPrint() {
+                setTimeout(function() {
+                  window.print();
+                }, 500);
+              }
+              
+              if (images.length === 0) {
+                triggerPrint();
+                return;
+              }
+              
+              var safetyTimeout = setTimeout(triggerPrint, 2500);
+              
+              images.forEach(function(img) {
+                if (img.complete) {
+                  loadedCount++;
+                  if (loadedCount === images.length) {
+                    clearTimeout(safetyTimeout);
+                    triggerPrint();
+                  }
+                } else {
+                  img.addEventListener('load', function() {
+                    loadedCount++;
+                    if (loadedCount === images.length) {
+                      clearTimeout(safetyTimeout);
+                      triggerPrint();
+                    }
+                  });
+                  img.addEventListener('error', function() {
+                    loadedCount++;
+                    if (loadedCount === images.length) {
+                      clearTimeout(safetyTimeout);
+                      triggerPrint();
+                    }
+                  });
+                }
+              });
+            });
+          </script>
         </body>
       </html>
     `);
     printWindow.document.close();
-    printWindow.print();
     onLogAction("Mengekspor laporan rekapitulasi data kependudukan PDF", "Kependudukan");
   };
 
@@ -484,9 +590,22 @@ export default function KependudukanView({
                     value={nik}
                     onChange={(e) => setNik(e.target.value.replace(/\D/g, ''))}
                     placeholder="Wajib 16 digit angka"
-                    className="w-full text-xs font-mono p-2 border border-slate-200 rounded-lg focus:ring-1 focus:ring-blue-500 text-slate-800 bg-slate-50"
+                    className={`w-full text-xs font-mono p-2 border rounded-lg focus:ring-1 focus:outline-none text-slate-800 transition-colors ${
+                      nik === ''
+                        ? 'border-slate-200 bg-slate-50 focus:ring-blue-500'
+                        : getNikValidationStatus().status === 'success'
+                        ? 'border-emerald-400 bg-emerald-50/10 focus:ring-emerald-500'
+                        : getNikValidationStatus().status === 'warning'
+                        ? 'border-amber-400 bg-amber-50/10 focus:ring-amber-500'
+                        : 'border-rose-400 bg-rose-50/10 focus:ring-rose-500'
+                    }`}
                     required
                   />
+                  <div className="mt-1 flex items-center gap-1">
+                    <span className={`text-[10px] font-mono leading-tight ${getNikValidationStatus().className}`}>
+                      {getNikValidationStatus().message}
+                    </span>
+                  </div>
                 </div>
 
                 <div>
