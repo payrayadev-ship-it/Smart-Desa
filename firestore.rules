@@ -1,0 +1,132 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // 1. Catch-All Global Deny Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    // Authenticated role checks
+    function hasRole(role) {
+      return isSignedIn() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+        getUserData().role == role;
+    }
+
+    function isStaff() {
+      return isSignedIn() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) && (
+          getUserData().role == "Super Admin" ||
+          getUserData().role == "Kepala Desa" ||
+          getUserData().role == "Sekretaris" ||
+          getUserData().role == "Bendahara" ||
+          getUserData().role == "Operator"
+        );
+    }
+
+    function isRtRw() {
+      return hasRole("RT/RW");
+    }
+
+    function isMasyarakat() {
+      return hasRole("Masyarakat");
+    }
+
+    // ID Validation Guard
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // USERS COLLECTION
+    match /users/{userId} {
+      allow get: if isSignedIn() && (isOwner(userId) || isStaff());
+      allow list: if isStaff();
+      allow create: if isSignedIn() && isOwner(userId) && 
+        request.resource.data.keys().hasAll(['uid', 'name', 'role']) &&
+        request.resource.data.role == "Masyarakat"; // Citizens can register themselves with "Masyarakat" role to prevent self-assigned admin privileges
+      
+      allow update: if isSignedIn() && isOwner(userId) && 
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'uid', 'nik']) &&
+        request.resource.data.name is string && request.resource.data.name.size() <= 100;
+        
+      allow delete: if isStaff() && getUserData().role == "Super Admin";
+    }
+
+    // RESIDENTS COLLECTION
+    match /residents/{residentId} {
+      allow get: if isSignedIn() && (isStaff() || isRtRw() || (isMasyarakat() && getUserData().nik == resource.data.nik));
+      allow list: if isSignedIn() && (isStaff() || isRtRw());
+      allow write: if isStaff();
+    }
+
+    // LETTERS COLLECTION
+    match /letters/{letterId} {
+      allow get: if isSignedIn() && (isStaff() || isRtRw() || (isMasyarakat() && getUserData().nik == resource.data.nik));
+      allow list: if isSignedIn() && (isStaff() || isRtRw() || (isMasyarakat() && resource.data.nik == getUserData().nik));
+      allow create: if isSignedIn() && 
+        request.resource.data.keys().hasAll(['id', 'nik', 'namaPemohon', 'jenisSurat', 'status']) &&
+        (isStaff() || (isMasyarakat() && request.resource.data.nik == getUserData().nik)) &&
+        request.resource.data.status == "Diajukan";
+      
+      allow update: if isStaff() || isRtRw();
+      allow delete: if isStaff();
+    }
+
+    // FINANCES COLLECTION
+    match /finances/{financeId} {
+      allow read: if isSignedIn(); // Publicly transparent for all villagers
+      allow write: if hasRole("Bendahara") || hasRole("Kepala Desa") || hasRole("Super Admin");
+    }
+
+    // ASSETS COLLECTION
+    match /assets/{assetId} {
+      allow read: if isSignedIn();
+      allow write: if isStaff();
+    }
+
+    // COMPLAINTS COLLECTION
+    match /complaints/{complaintId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && 
+        request.resource.data.keys().hasAll(['id', 'title', 'status']) &&
+        (isStaff() || (isMasyarakat() && request.resource.data.reporterNik == getUserData().nik)) &&
+        request.resource.data.status == "Diajukan";
+      allow update: if isStaff() || (isMasyarakat() && resource.data.reporterNik == getUserData().nik && 
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['id', 'reporterNik', 'reporterName']));
+      allow delete: if isStaff();
+    }
+
+    // ANNOUNCEMENTS COLLECTION
+    match /announcements/{announcementId} {
+      allow read: if isSignedIn();
+      allow write: if isStaff() || isRtRw();
+    }
+
+    // AGENDAS COLLECTION
+    match /agendas/{agendaId} {
+      allow read: if isSignedIn();
+      allow write: if isStaff() || isRtRw();
+    }
+
+    // AUDIT LOGS COLLECTION
+    match /auditLogs/{logId} {
+      allow read: if isStaff();
+      allow create: if isSignedIn(); // Any authenticated element can log actions
+      allow update, delete: if false; // Logs are immutable 
+    }
+  }
+}

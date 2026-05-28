@@ -1,0 +1,180 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Auth users profiles and roles",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "name": { "type": "string" },
+        "role": { "type": "string" },
+        "nik": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["uid", "name", "role"]
+    },
+    "Resident": {
+      "title": "Resident",
+      "description": "Information about a village resident",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "nik": { "type": "string" },
+        "noKK": { "type": "string" },
+        "nama": { "type": "string" },
+        "jenisKelamin": { "type": "string" },
+        "alamat": { "type": "string" },
+        "rt": { "type": "string" },
+        "rw": { "type": "string" },
+        "statusPenduduk": { "type": "string" },
+        "statusBansos": { "type": "string" }
+      },
+      "required": ["id", "nik", "nama"]
+    },
+    "Letter": {
+      "title": "Letter",
+      "description": "Administrative letter request records",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "nik": { "type": "string" },
+        "namaPemohon": { "type": "string" },
+        "jenisSurat": { "type": "string" },
+        "tanggalPengajuan": { "type": "string" },
+        "status": { "type": "string" },
+        "keterangan": { "type": "string" },
+        "diinputDari": { "type": "string" }
+      },
+      "required": ["id", "nik", "namaPemohon", "jenisSurat", "status"]
+    },
+    "Finance": {
+      "title": "Finance",
+      "description": "Village budget transaction record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tanggal": { "type": "string" },
+        "kategori": { "type": "string" },
+        "tipe": { "type": "string" },
+        "jumlah": { "type": "number" },
+        "keterangan": { "type": "string" }
+      },
+      "required": ["id", "tanggal", "kategori", "tipe", "jumlah"]
+    },
+    "Asset": {
+      "title": "Asset",
+      "description": "Village inventory & asset record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "code": { "type": "string" },
+        "name": { "type": "string" },
+        "category": { "type": "string" },
+        "condition": { "type": "string" },
+        "purchaseValue": { "type": "number" },
+        "currentValue": { "type": "number" },
+        "location": { "type": "string" }
+      },
+      "required": ["id", "code", "name"]
+    },
+    "Complaint": {
+      "title": "Complaint",
+      "description": "Citizen infrastructure complaints",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "category": { "type": "string" },
+        "description": { "type": "string" },
+        "reporterName": { "type": "string" },
+        "reporterNik": { "type": "string" },
+        "status": { "type": "string" },
+        "date": { "type": "string" }
+      },
+      "required": ["id", "title", "status"]
+    },
+    "Announcement": {
+      "title": "Announcement",
+      "description": "Public village broadcast announcements",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "category": { "type": "string" },
+        "author": { "type": "string" },
+        "date": { "type": "string" },
+        "isActive": { "type": "boolean" }
+      },
+      "required": ["id", "title", "content", "isActive"]
+    },
+    "Agenda": {
+      "title": "Agenda",
+      "description": "Village government offline events & agendas",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "date": { "type": "string" },
+        "time": { "type": "string" },
+        "location": { "type": "string" },
+        "attendees": { "type": "string" }
+      },
+      "required": ["id", "title", "date"]
+    },
+    "AuditLog": {
+      "title": "AuditLog",
+      "description": "Activity security trace log",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "userRole": { "type": "string" },
+        "action": { "type": "string" },
+        "module": { "type": "string" },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["id", "action", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Collection of user auth profile records"
+    },
+    "/residents/{residentId}": {
+      "schema": "Resident",
+      "description": "Collection of local citizens personal record cards"
+    },
+    "/letters/{letterId}": {
+      "schema": "Letter",
+      "description": "Collection of administrative application submissions letters"
+    },
+    "/finances/{financeId}": {
+      "schema": "Finance",
+      "description": "Collection of public village money ledger transactions"
+    },
+    "/assets/{assetId}": {
+      "schema": "Asset",
+      "description": "Collection of public state assets"
+    },
+    "/complaints/{complaintId}": {
+      "schema": "Complaint",
+      "description": "Collection of citizen feedback and public service complaints"
+    },
+    "/announcements/{announcementId}": {
+      "schema": "Announcement",
+      "description": "Collection of active administrative village declarations"
+    },
+    "/agendas/{agendaId}": {
+      "schema": "Agenda",
+      "description": "Collection of upcoming community government events"
+    },
+    "/auditLogs/{logId}": {
+      "schema": "AuditLog",
+      "description": "Collection of operational trace audit activity event logs"
+    }
+  }
+}

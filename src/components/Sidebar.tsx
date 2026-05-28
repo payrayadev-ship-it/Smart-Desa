@@ -14,7 +14,9 @@ import {
   Settings,
   ChevronLeft,
   ChevronRight,
-  Menu
+  Menu,
+  Monitor,
+  LogOut
 } from 'lucide-react';
 import { Role, VillageProfile } from '../types';
 
@@ -24,9 +26,10 @@ interface SidebarProps {
   activeRole: Role;
   setActiveRole: (role: Role) => void;
   villageProfile: VillageProfile;
+  onLogout?: () => void;
 }
 
-export default function Sidebar({ currentView, setView, activeRole, setActiveRole, villageProfile }: SidebarProps) {
+export default function Sidebar({ currentView, setView, activeRole, setActiveRole, villageProfile, onLogout }: SidebarProps) {
   const [isOpen, setIsOpen] = React.useState(true);
 
   // Define navigation items with translation and icon
@@ -34,6 +37,7 @@ export default function Sidebar({ currentView, setView, activeRole, setActiveRol
     { id: 'dashboard', label: 'Dashboard Desa', icon: LayoutDashboard, roles: ['Super Admin', 'Kepala Desa', 'Sekretaris', 'Bendahara', 'Operator', 'RT/RW'] },
     { id: 'kependudukan', label: 'Data Penduduk', icon: Users, roles: ['Super Admin', 'Kepala Desa', 'Sekretaris', 'Operator'] },
     { id: 'surat', label: 'Surat Menyurat', icon: FileText, roles: ['Super Admin', 'Kepala Desa', 'Sekretaris', 'Operator', 'RT/RW'] },
+    { id: 'kiosk', label: 'Monitor Kiosk Surat', icon: Monitor, roles: ['Super Admin', 'Kepala Desa', 'Sekretaris', 'Operator', 'RT/RW'] },
     { id: 'keuangan', label: 'APBDes & Keuangan', icon: CreditCard, roles: ['Super Admin', 'Kepala Desa', 'Bendahara'] },
     { id: 'bansos', label: 'Bantuan Sosial', icon: HeartHandshake, roles: ['Super Admin', 'Kepala Desa', 'Sekretaris', 'Operator', 'RT/RW'] },
     { id: 'aset', label: 'Aset & Inventaris', icon: Box, roles: ['Super Admin', 'Kepala Desa', 'Sekretaris', 'Operator'] },
@@ -123,32 +127,42 @@ export default function Sidebar({ currentView, setView, activeRole, setActiveRol
           <div className="space-y-2">
             <div className="flex items-center justify-between text-[11px] text-slate-400 font-medium">
               <span>HAK AKSES AKTIF:</span>
-              <Sparkles size={11} className="text-amber-400 animate-pulse" />
+              <Sparkles size={11} className={activeRole === 'Masyarakat' ? "text-blue-400 animate-pulse" : "text-amber-400 animate-pulse"} />
             </div>
-            <select
-              id="role-switcher-select"
-              value={activeRole}
-              onChange={(e) => {
-                const targetRole = e.target.value as Role;
-                setActiveRole(targetRole);
-                if (targetRole === 'Masyarakat') {
-                  setView('pelayanan-warga');
-                } else if (targetRole === 'RT/RW') {
-                  setView('rtrw');
-                } else {
-                  setView('dashboard');
-                }
-              }}
-              className="w-full text-xs bg-slate-800 text-white rounded-lg p-2.5 font-medium border border-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500"
-            >
-              {rolesList.map((role) => (
-                <option key={role} value={role}>{role}</option>
-              ))}
-            </select>
+            {activeRole === 'Masyarakat' ? (
+              <div className="w-full text-xs bg-blue-950/40 border border-blue-900/60 text-blue-400 rounded-lg p-2.5 font-bold flex items-center gap-1.5 uppercase tracking-wider font-mono">
+                <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse shrink-0"></span>
+                <span>MASYARAKAT MANDIRI</span>
+              </div>
+            ) : (
+              <select
+                id="role-switcher-select"
+                value={activeRole}
+                onChange={(e) => {
+                  const targetRole = e.target.value as Role;
+                  setActiveRole(targetRole);
+                  if (targetRole === 'Masyarakat') {
+                    setView('pelayanan-warga');
+                  } else if (targetRole === 'RT/RW') {
+                    setView('rtrw');
+                  } else {
+                    setView('dashboard');
+                  }
+                }}
+                className="w-full text-xs bg-slate-800 text-white rounded-lg p-2.5 font-medium border border-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              >
+                {rolesList.filter(role => role !== 'Masyarakat').map((role) => (
+                  <option key={role} value={role}>{role}</option>
+                ))}
+              </select>
+            )}
           </div>
         ) : (
           <div className="flex justify-center">
-            <div className="p-1 px-2.5 bg-slate-800 rounded-full text-[10px] font-bold text-blue-400 cursor-pointer" title="Ubah Hak Akses">
+            <div 
+              className={`p-1 px-2.5 rounded-full text-[10px] font-bold cursor-default ${activeRole === 'Masyarakat' ? 'bg-blue-950 text-blue-400 border border-blue-900/55' : 'bg-slate-800 text-blue-400'}`} 
+              title={activeRole === 'Masyarakat' ? "Akses Masyarakat Mandiri" : "Ubah Hak Akses"}
+            >
               {activeRole.substring(0, 3).toUpperCase()}
             </div>
           </div>
@@ -159,13 +173,38 @@ export default function Sidebar({ currentView, setView, activeRole, setActiveRol
             <div className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-xs text-blue-400">
               {activeRole.charAt(0)}
             </div>
-            <div className="leading-tight truncate">
+            <div className="leading-tight truncate flex-grow">
               <p className="text-xs font-semibold text-slate-200 truncate font-sans">
                 {activeRole === 'Masyarakat' ? `Warga ${villageProfile.name.replace('Desa ', '')}` : activeRole === 'RT/RW' ? 'Bpk. Yanto (RT)' : 'Staf Desa'}
               </p>
               <p className="text-[10px] text-slate-500 font-mono truncate">ID: {activeRole.substring(0, 3)}..-02</p>
             </div>
           </div>
+        )}
+
+        {onLogout && (
+          <button
+            id="sidebar-logout-action-btn"
+            onClick={() => {
+              try {
+                const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.frequency.setValueAtTime(300, audioCtx.currentTime);
+                gain.gain.setValueAtTime(0.04, audioCtx.currentTime);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.08);
+              } catch(err){}
+              onLogout();
+            }}
+            className={`w-full flex items-center gap-2.5 p-2 rounded-lg text-rose-450 hover:text-white hover:bg-rose-950/60 transition-all font-mono text-[10px] font-black border border-transparent hover:border-rose-900/40 ${!isOpen ? 'justify-center p-1.5' : ''}`}
+            title="Keluar dari Portal"
+          >
+            <LogOut size={13} className="shrink-0 text-rose-450" />
+            {isOpen && <span className="tracking-wider">KELUAR PORTAL</span>}
+          </button>
         )}
       </div>
     </aside>

@@ -1,13 +1,14 @@
-import { Calendar, Bell, Shield, CloudSun } from 'lucide-react';
+import { Calendar, Bell, Shield, CloudSun, LogOut } from 'lucide-react';
 import { Role, VillageProfile } from '../types';
 
 interface HeaderProps {
   activeRole: Role;
   onOpenAiAssistant: () => void;
   villageProfile: VillageProfile;
+  onLogout?: () => void;
 }
 
-export default function Header({ activeRole, onOpenAiAssistant, villageProfile }: HeaderProps) {
+export default function Header({ activeRole, onOpenAiAssistant, villageProfile, onLogout }: HeaderProps) {
   const formatIndonesianDate = () => {
     const options: Intl.DateTimeFormatOptions = { 
       weekday: 'long', 
@@ -66,6 +67,17 @@ export default function Header({ activeRole, onOpenAiAssistant, villageProfile }
           <Bell size={18} />
           <span className="absolute top-1 right-1 w-2 h-2 bg-rose-500 rounded-full"></span>
         </button>
+
+        {onLogout && (
+          <button 
+            id="header-logout-btn"
+            onClick={onLogout}
+            className="p-2 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg relative transition-colors flex items-center justify-center border border-transparent hover:border-rose-100"
+            title="Keluar dari Portal (Logout)"
+          >
+            <LogOut size={17} />
+          </button>
+        )}
       </div>
     </header>
   );
