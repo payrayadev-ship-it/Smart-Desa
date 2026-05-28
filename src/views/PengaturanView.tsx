@@ -26,6 +26,7 @@ interface PengaturanViewProps {
   onLogAction: (action: string, module: string) => void;
   portalCredentials: { credentials: PortalCredential[] };
   savePortalCredentials: (data: { credentials: PortalCredential[] }) => void;
+  onSyncAllData: () => Promise<boolean>;
 }
 
 export default function PengaturanView({
@@ -33,7 +34,8 @@ export default function PengaturanView({
   saveProfile,
   onLogAction,
   portalCredentials,
-  savePortalCredentials
+  savePortalCredentials,
+  onSyncAllData
 }: PengaturanViewProps) {
   const [formProfile, setFormProfile] = useState<VillageProfile>({ ...profile });
   const [newMission, setNewMission] = useState('');
@@ -57,6 +59,7 @@ export default function PengaturanView({
   const signatureInputRef = useRef<HTMLInputElement>(null);
 
   const [testStatus, setTestStatus] = useState<'idle' | 'loading' | 'success' | 'failed'>('idle');
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'loading' | 'success' | 'failed'>('idle');
 
   const handleTestConnection = async () => {
     setTestStatus('loading');
@@ -69,6 +72,25 @@ export default function PengaturanView({
       onLogAction("Menjalankan uji koneksi simpan dokumen test Firestore: Gagal dengan exception", "Pengaturan");
     }
     setTimeout(() => setTestStatus('idle'), 4000);
+  };
+
+  const handleForceSyncAll = async () => {
+    setSyncStatus('loading');
+    try {
+      const success = await onSyncAllData();
+      setSyncStatus(success ? 'success' : 'failed');
+      if (success) {
+        alert("Sinkronisasi Sukses! Seluruh data kependudukan, surat, keuangan, aset, pengaduan, pengumuman, agenda, audit log, dan profil desa telah berhasil diunggah ke cloud database Firebase.");
+        onLogAction("Melakukan sinkronisasi paksa seluruh data lokal ke cloud Firestore", "Pengaturan");
+      } else {
+        alert("Sinkronisasi Gagal! Mohon periksa koneksi internet Anda atau pastikan aturan keamanan Firebase terpasang.");
+        onLogAction("Melakukan sinkronisasi paksa seluruh data lokal ke cloud Firestore: GAGAL", "Pengaturan");
+      }
+    } catch (e) {
+      setSyncStatus('failed');
+      alert("Terjadi kesalahan sistem saat menyinkronkan data.");
+    }
+    setTimeout(() => setSyncStatus('idle'), 4000);
   };
 
   // Synchronize state when props update
@@ -1074,7 +1096,7 @@ export default function PengaturanView({
             </span>
             <p className="text-[9.5px] text-slate-500 font-mono leading-tight">Seluruh perubahan yang disimpan akan langsung diinjeksikan secara real-time ke dalam KOP surat dinas resmi, berkas kependudukan, buku APBDes, dan portal publik.</p>
             
-            <div className="pt-1.5 border-t border-slate-200/60 pb-1">
+            <div className="pt-1.5 border-t border-slate-200/60 pb-1 space-y-2">
               <button
                 type="button"
                 onClick={handleTestConnection}
@@ -1098,6 +1120,32 @@ export default function PengaturanView({
                     : testStatus === 'failed'
                     ? 'Koneksi Gagal (Periksa Aturan/Sinyal) ❌'
                     : 'Uji Koneksi Simpan Dokumen Cloud'}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleForceSyncAll}
+                disabled={syncStatus === 'loading'}
+                className={`w-full py-2 px-3 border rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+                  syncStatus === 'loading'
+                    ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
+                    : syncStatus === 'success'
+                    ? 'bg-cyan-50 border-cyan-300 text-cyan-700 shadow-sm shadow-cyan-100'
+                    : syncStatus === 'failed'
+                    ? 'bg-rose-50 border-rose-300 text-rose-700 shadow-sm shadow-rose-100'
+                    : 'bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 border-transparent text-white active:scale-95 shadow-md cursor-pointer'
+                }`}
+              >
+                <RefreshCw size={12} className={`${syncStatus === 'loading' ? 'animate-spin' : ''}`} />
+                <span>
+                  {syncStatus === 'loading'
+                    ? 'Menyinkronkan Data Cloud...'
+                    : syncStatus === 'success'
+                    ? 'Sinkronisasi Cloud: SUKSES ✔'
+                    : syncStatus === 'failed'
+                    ? 'Sinkronisasi Gagal ❌'
+                    : 'Sinkronkan Semua Data ke Firebase'}
                 </span>
               </button>
             </div>

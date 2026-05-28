@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { Letter, LetterType, Role, VillageProfile } from '../types';
 import KtpScanner from '../components/KtpScanner';
+import { LETTER_CATALOG } from '../letterCatalog';
 
 interface SuratViewProps {
   letters: Letter[];
@@ -25,6 +26,7 @@ interface SuratViewProps {
   activeRole: Role;
   onLogAction: (action: string, module: string) => void;
   villageProfile: VillageProfile;
+  currentUser?: { name: string; role: Role; nik?: string } | null;
 }
 
 export default function SuratView({
@@ -32,7 +34,8 @@ export default function SuratView({
   saveLetters,
   activeRole,
   onLogAction,
-  villageProfile
+  villageProfile,
+  currentUser
  }: SuratViewProps) {
   const [letters, setLetters] = useState<Letter[]>(initialLetters);
   const [search, setSearch] = useState('');
@@ -44,47 +47,47 @@ export default function SuratView({
   const [onlyMyLetters, setOnlyMyLetters] = useState(activeRole === 'Masyarakat');
 
   // New Letter Submission Form Modal
-  const [showForm, setShowForm] = useState(false);
+  const [showForm, setShowForm] = useState(activeRole === 'Masyarakat');
   const [selectedType, setSelectedType] = useState<LetterType>('Surat Keterangan Domisili');
-  const [requesterName, setRequesterName] = useState('');
-  const [requesterNik, setRequesterNik] = useState('');
+  const [requesterName, setRequesterName] = useState(activeRole === 'Masyarakat' && currentUser ? currentUser.name : '');
+  const [requesterNik, setRequesterNik] = useState(activeRole === 'Masyarakat' && currentUser ? currentUser.nik || '' : '');
   const [keperluan, setKeperluan] = useState('');
+
+  // Dynamically sync state if role or user session changes
+  React.useEffect(() => {
+    if (activeRole === 'Masyarakat') {
+      setOnlyMyLetters(true);
+      setShowForm(true);
+      if (currentUser) {
+        setRequesterName(currentUser.name);
+        setRequesterNik(currentUser.nik || '');
+      }
+    }
+  }, [activeRole, currentUser]);
   
-  // Custom SKU Fields
-  const [namaUsaha, setNamaUsaha] = useState('');
-  const [alamatUsaha, setAlamatUsaha] = useState('');
+  // Dynamic custom fields based on selected letter type
+  const [dynamicFields, setDynamicFields] = useState<Record<string, string>>({});
 
-  // Custom SKTM Fields
-  const [namaAnak, setNamaAnak] = useState('');
-  const [tujuanPengajuan, setTujuanPengajuan] = useState('');
+  // Reset and initialize fields when selecting a letter type
+  const handleTypeChange = (newType: LetterType) => {
+    setSelectedType(newType);
+    const template = LETTER_CATALOG.find(t => t.name === newType);
+    const initialFields: Record<string, string> = {};
+    if (template) {
+      template.fields.forEach(f => {
+        initialFields[f] = '';
+      });
+    }
+    setDynamicFields(initialFields);
+  };
 
-  // Selectable list of letter types
-  const letterTypes: LetterType[] = [
-    'Surat Keterangan Domisili',
-    'Surat Keterangan Usaha',
-    'Surat Keterangan Tidak Mampu (SKTM)',
-    'Surat Keterangan Kelahiran',
-    'Surat Keterangan Kematian',
-    'Surat Keterangan Pindah',
-    'Surat Pengantar Nikah',
-    'Surat Izin Keramaian',
-    'Surat Keterangan Umum'
-  ];
+  // Selectable list of letter types mapped from master catalog
+  const letterTypes = LETTER_CATALOG.map(t => t.name);
 
   // Increment auto numbering
   const generateLetterNumber = (type: LetterType) => {
-    const codeMap: Record<LetterType, string> = {
-      'Surat Keterangan Domisili': 'SKD',
-      'Surat Keterangan Usaha': 'SKU',
-      'Surat Keterangan Tidak Mampu (SKTM)': 'SKTM',
-      'Surat Keterangan Kelahiran': 'SKKL',
-      'Surat Keterangan Kematian': 'SKKM',
-      'Surat Keterangan Pindah': 'SKP',
-      'Surat Pengantar Nikah': 'SPN',
-      'Surat Izin Keramaian': 'SIK',
-      'Surat Keterangan Umum': 'SKU-GEN'
-    };
-    const code = codeMap[type] || 'SK';
+    const template = LETTER_CATALOG.find(t => t.name === type);
+    const code = template ? template.code : 'SK';
     const runningNum = String(letters.length + 1).padStart(3, '0');
     return `470/${runningNum}/${code}-SM/${new Date().getFullYear()}`;
   };
@@ -96,14 +99,10 @@ export default function SuratView({
       return;
     }
 
-    const subFields: Record<string, string> = { keperluan };
-    if (selectedType === 'Surat Keterangan Usaha') {
-      subFields.namaUsaha = namaUsaha;
-      subFields.alamatUsaha = alamatUsaha;
-    } else if (selectedType === 'Surat Keterangan Tidak Mampu (SKTM)') {
-      subFields.namaAnak = namaAnak;
-      subFields.tujuanPengajuan = tujuanPengajuan;
-    }
+    const subFields: Record<string, string> = { 
+      keperluan,
+      ...dynamicFields
+    };
 
     const newId = `let-${Date.now()}`;
     const newLetter: Letter = {
@@ -136,10 +135,7 @@ export default function SuratView({
     setRequesterName('');
     setRequesterNik('');
     setKeperluan('');
-    setNamaUsaha('');
-    setAlamatUsaha('');
-    setNamaAnak('');
-    setTujuanPengajuan('');
+    setDynamicFields({});
     setShowForm(false);
   };
 
@@ -254,15 +250,18 @@ export default function SuratView({
           </div>
 
           <table class="fields-table">
-            <tr><td width="30%">1. Nama Pemohon</td><td>: <b>${letItem.requesterName}</b></td></tr>
-            <tr><td>2. NIK pemohon</td><td>: ${letItem.requesterNik}</td></tr>
-            <tr><td>3. Jenis Surat Kelayakan</td><td>: ${letItem.type}</td></tr>
-            ${Object.entries(letItem.fields).map(([key, val]) => `
-              <tr>
-                <td style="text-transform: capitalize;">4. ${key.replace(/([A-Z])/g, ' $1')}</td>
-                <td>: <b>${val}</b></td>
-              </tr>
-            `).join('')}
+            <tr><td width="35%">1. Nama Pemohon</td><td>: <b>${letItem.requesterName}</b></td></tr>
+            <tr><td>2. NIK Pemohon</td><td>: ${letItem.requesterNik}</td></tr>
+            <tr><td>3. Jenis Layanan Surat</td><td>: <b>${letItem.type}</b></td></tr>
+            ${Object.entries(letItem.fields).map(([key, val], index) => {
+              const label = key.charAt(0).toUpperCase() + key.slice(1);
+              return `
+                <tr>
+                  <td>${index + 4}. ${label}</td>
+                  <td>: <b>${val}</b></td>
+                </tr>
+              `;
+            }).join('')}
           </table>
 
           <div class="content-block" style="margin-top: 15px;">
@@ -415,8 +414,21 @@ export default function SuratView({
           onChange={(e) => setFilterType(e.target.value)}
           className="text-xs bg-slate-50 font-semibold border border-slate-200 rounded-lg p-2 text-slate-700"
         >
-          <option value="Semua">Semua Jenis Layanan Surat</option>
-          {letterTypes.map((t) => <option key={t} value={t}>{t}</option>)}
+          <option value="Semua">Semua Jenis Layanan Surat ({LETTER_CATALOG.length} Layanan)</option>
+          {[
+            'Surat Izin',
+            'Surat Keterangan',
+            'Lainnya',
+            'Surat Kuasa & Administrasi'
+          ].map((cat) => (
+            <optgroup key={cat} label={cat.toUpperCase()} className="font-extrabold text-[10px] text-slate-500 font-mono tracking-widest bg-slate-100 p-1">
+              {LETTER_CATALOG.filter(t => t.category === cat).map((item) => (
+                <option key={item.name} value={item.name} className="font-medium text-xs text-slate-800 bg-white">
+                  {item.name}
+                </option>
+              ))}
+            </optgroup>
+          ))}
         </select>
 
         {/* Filter Status */}
@@ -469,30 +481,45 @@ export default function SuratView({
                 <select
                   id="select-type-field"
                   value={selectedType}
-                  onChange={(e) => setSelectedType(e.target.value as LetterType)}
+                  onChange={(e) => handleTypeChange(e.target.value as LetterType)}
                   className="w-full text-xs font-semibold p-2 border border-slate-200 rounded-lg bg-slate-50 text-slate-800"
                 >
-                  {letterTypes.map((t) => <option key={t} value={t}>{t}</option>)}
+                  {[
+                    'Surat Izin',
+                    'Surat Keterangan',
+                    'Lainnya',
+                    'Surat Kuasa & Administrasi'
+                  ].map((cat) => (
+                    <optgroup key={cat} label={cat.toUpperCase()} className="font-extrabold text-[10px] text-slate-500 font-mono tracking-widest bg-slate-100 p-1">
+                      {LETTER_CATALOG.filter(t => t.category === cat).map((item) => (
+                        <option key={item.name} value={item.name} className="font-medium text-xs text-slate-800 bg-white">
+                          {item.name} ({item.code})
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
                 </select>
               </div>
 
               {/* SCAN KTP FAST-FILL ASSISTANT CARD */}
-              <div className="p-3 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-150 rounded-xl flex items-center justify-between gap-3 shadow-inner">
-                <div className="space-y-0.5">
-                  <span className="text-[9px] font-black tracking-wider text-blue-700 bg-blue-150 px-1.5 py-0.5 rounded uppercase font-mono">INTEGRATED OCR</span>
-                  <h4 className="text-xs font-bold text-indigo-950">Isi Form via Scan E-KTP</h4>
-                  <p className="text-[10px] text-slate-500 leading-none">Gunakan kamera hp/snap atau contoh KTP untuk input instant.</p>
+              {activeRole !== 'Masyarakat' && (
+                <div className="p-3 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-150 rounded-xl flex items-center justify-between gap-3 shadow-inner">
+                  <div className="space-y-0.5">
+                    <span className="text-[9px] font-black tracking-wider text-blue-700 bg-blue-150 px-1.5 py-0.5 rounded uppercase font-mono">INTEGRATED OCR</span>
+                    <h4 className="text-xs font-bold text-indigo-950">Isi Form via Scan E-KTP</h4>
+                    <p className="text-[10px] text-slate-500 leading-none">Gunakan kamera hp/snap atau contoh KTP untuk input instant.</p>
+                  </div>
+                  <button
+                    type="button"
+                    id="scan-ktp-assistant-btn"
+                    onClick={() => setShowScanner(true)}
+                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[10px] font-extrabold font-mono flex items-center gap-1 hover:shadow-md transition-all shrink-0"
+                  >
+                    <Camera size={12} />
+                    <span>IMPOR / SCAN E-KTP</span>
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  id="scan-ktp-assistant-btn"
-                  onClick={() => setShowScanner(true)}
-                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[10px] font-extrabold font-mono flex items-center gap-1 hover:shadow-md transition-all shrink-0"
-                >
-                  <Camera size={12} />
-                  <span>IMPOR / SCAN E-KTP</span>
-                </button>
-              </div>
+              )}
 
               <div>
                 <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 font-mono">Nomor Induk Kependudukan (NIK Pemohon)*</label>
@@ -503,7 +530,8 @@ export default function SuratView({
                   value={requesterNik}
                   onChange={(e) => setRequesterNik(e.target.value.replace(/\D/g, ''))}
                   placeholder="Masukkan 16 digit NIK warga terdaftar"
-                  className="w-full text-xs p-2 border border-slate-200 rounded-lg bg-slate-50 text-slate-800 font-mono"
+                  className={`w-full text-xs p-2 border border-slate-200 rounded-lg text-slate-800 font-mono ${activeRole === 'Masyarakat' ? 'bg-slate-100 cursor-not-allowed font-extrabold text-blue-900' : 'bg-slate-50'}`}
+                  readOnly={activeRole === 'Masyarakat'}
                   required
                 />
               </div>
@@ -516,75 +544,55 @@ export default function SuratView({
                   value={requesterName}
                   onChange={(e) => setRequesterName(e.target.value)}
                   placeholder="Nama Lengkap dengan spasi teratur"
-                  className="w-full text-xs font-semibold p-2 border border-slate-200 rounded-lg bg-slate-50 text-slate-800"
+                  className={`w-full text-xs font-semibold p-2 border border-slate-200 rounded-lg text-slate-800 ${activeRole === 'Masyarakat' ? 'bg-slate-100 cursor-not-allowed font-extrabold text-blue-900' : 'bg-slate-50'}`}
+                  readOnly={activeRole === 'Masyarakat'}
                   required
                 />
               </div>
 
               {/* Dynamic Sub fields depending on state */}
-              {selectedType === 'Surat Keterangan Usaha' ? (
-                <>
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 font-mono">Nama Usaha / Toko / Dagang</label>
-                    <input
-                      id="sku-business-name-input"
-                      type="text"
-                      value={namaUsaha}
-                      onChange={(e) => setNamaUsaha(e.target.value)}
-                      placeholder="Contoh: Toko Beras Jaya Abadi"
-                      className="w-full text-xs p-2 border border-slate-200 rounded-lg bg-slate-50 text-slate-800 font-bold"
-                    />
+              {(() => {
+                const template = LETTER_CATALOG.find(t => t.name === selectedType);
+                if (!template) return null;
+                return (
+                  <div className="space-y-3 bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+                    <p className="text-[10px] font-bold text-blue-800 font-mono uppercase bg-blue-50 px-2 py-0.5 w-max rounded border border-blue-100">
+                      Isian Pelayanan ({template.category})
+                    </p>
+                    {template.fields.map((field) => (
+                      <div key={field}>
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 font-mono">
+                          {field}*
+                        </label>
+                        <input
+                          id={`dynamic-field-${field}`}
+                          type="text"
+                          value={dynamicFields[field] || ''}
+                          onChange={(e) => setDynamicFields(prev => ({
+                            ...prev,
+                            [field]: e.target.value
+                          }))}
+                          placeholder={`Masukkan ${field.toLowerCase()}...`}
+                          className="w-full text-xs p-2 border border-slate-200 rounded-lg bg-white text-slate-800 font-semibold focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
+                          required
+                        />
+                      </div>
+                    ))}
                   </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 font-mono">Alamat Lokasi Usaha</label>
-                    <input
-                      id="sku-business-address-input"
-                      type="text"
-                      value={alamatUsaha}
-                      onChange={(e) => setAlamatUsaha(e.target.value)}
-                      placeholder="Contoh: Kp. Babakan RT 03/05"
-                      className="w-full text-xs p-2 border border-slate-200 rounded-lg bg-slate-50 text-slate-800"
-                    />
-                  </div>
-                </>
-              ) : selectedType === 'Surat Keterangan Tidak Mampu (SKTM)' ? (
-                <>
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 font-mono">Nama Anak Candradimuka (Jika diwakili)</label>
-                    <input
-                      id="sktm-child-name-input"
-                      type="text"
-                      value={namaAnak}
-                      onChange={(e) => setNamaAnak(e.target.value)}
-                      placeholder="Nama anak kandung sekolah terkait"
-                      className="w-full text-xs p-2 border border-slate-200 rounded-lg bg-slate-50 text-slate-800"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 font-mono">Tujuan Pengajuan Beasiswa / Bantuan</label>
-                    <input
-                      id="sktm-purpose-input"
-                      type="text"
-                      value={tujuanPengajuan}
-                      onChange={(e) => setTujuanPengajuan(e.target.value)}
-                      placeholder="Keringanan SPP / Bantuan Rujukan Puskesmas"
-                      className="w-full text-xs p-2 border border-slate-200 rounded-lg bg-slate-50 text-slate-800"
-                    />
-                  </div>
-                </>
-              ) : (
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 font-mono">Keperluan Surat / Alasan Tertulis</label>
-                  <input
-                    id="common-purpose-input"
-                    type="text"
-                    value={keperluan}
-                    onChange={(e) => setKeperluan(e.target.value)}
-                    placeholder="Contoh: Pengurusan mutasi kerja / BPJS Kesehatan"
-                    className="w-full text-xs p-2 border border-slate-200 rounded-lg bg-slate-50 text-slate-800"
-                  />
-                </div>
-              )}
+                );
+              })()}
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 font-mono">Keperluan Surat / Alasan Tertulis</label>
+                <input
+                  id="common-purpose-input"
+                  type="text"
+                  value={keperluan}
+                  onChange={(e) => setKeperluan(e.target.value)}
+                  placeholder="Contoh: Pengurusan administratif / keperluan terkait"
+                  className="w-full text-xs p-2 border border-slate-200 rounded-lg bg-slate-50 text-slate-800"
+                />
+              </div>
 
               <div className="flex justify-end gap-2.5 pt-4 border-t border-slate-100">
                 <button

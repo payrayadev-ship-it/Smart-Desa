@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { Letter, LetterType, Role, VillageProfile } from '../types';
 import KtpScanner from '../components/KtpScanner';
+import { LETTER_CATALOG } from '../letterCatalog';
 
 interface KioskViewProps {
   letters: Letter[];
@@ -47,6 +48,24 @@ export default function KioskView({
   const [keperluan, setKeperluan] = useState('');
   const [karcisNo, setKarcisNo] = useState('');
   const [activeTab, setActiveTab2] = useState<'num-pad' | 'manual'>('num-pad');
+
+  // Dynamic state for kiosk categories & custom fields
+  const [kioskCat, setKioskCat] = useState<string>('Surat Keterangan');
+  const [kioskSearch, setKioskSearch] = useState<string>('');
+  const [dynamicFields, setDynamicFields] = useState<Record<string, string>>({});
+
+  const handleKioskTypeSelect = (type: LetterType) => {
+    setSelectedType(type);
+    const template = LETTER_CATALOG.find(t => t.name === type);
+    const initialFields: Record<string, string> = {};
+    if (template) {
+      template.fields.forEach(f => {
+        initialFields[f] = '';
+      });
+    }
+    setDynamicFields(initialFields);
+    setKioskStep('fill-detail');
+  };
 
   // Live Timer for Lobby Monitor Display
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -143,6 +162,17 @@ export default function KioskView({
 
   // Submitting Draft to State and generate real ticket queue code
   const handleSubmitKioskLetter = () => {
+    // Validate that all required dynamic fields are filled out
+    const template = LETTER_CATALOG.find(t => t.name === selectedType);
+    if (template) {
+      const missingField = template.fields.find(f => !dynamicFields[f]?.trim());
+      if (missingField) {
+        playKioskSound('beep');
+        alert(`Harap lengkapi isian tambahan: ${missingField}!`);
+        return;
+      }
+    }
+
     if (!requesterNik || !requesterName || !keperluan) {
       playKioskSound('beep');
       alert("Harap lengkapi seluruh data pemohon & deskripsi keperluan dahulu!");
@@ -162,7 +192,8 @@ export default function KioskView({
       rtApproval: false,
       fields: {
         "Keperluan Warga": keperluan,
-        "Diinput Melalui": "Anjungan Kiosk Mandiri Kantor Desa"
+        "Diinput Melalui": "Anjungan Kiosk Mandiri Kantor Desa",
+        ...dynamicFields
       },
       trackingLogs: [
         {
@@ -189,6 +220,8 @@ export default function KioskView({
     setRequesterNik('');
     setRequesterName('');
     setKeperluan('');
+    setKioskSearch('');
+    setDynamicFields({});
     setKioskStep('welcome');
   };
 
@@ -545,67 +578,122 @@ export default function KioskView({
           {kioskStep === 'select-service' && (
             <div className="p-6 sm:p-8 flex-grow flex flex-col justify-between transition-all duration-300">
               <div>
-                <div className="flex justify-between items-center mb-4">
+                <div className="flex flex-col md:flex-row md:items-center justify-between mb-4 gap-3 border-b border-slate-800 pb-3">
                   <div>
                     <span className="text-[9px] text-blue-400 font-mono font-medium">IDENTITAS TERVERIFIKASI IN LINE</span>
-                    <h3 className="text-base font-black text-slate-200 font-sans">PILIH MENU PELAYANAN SURAT</h3>
+                    <h3 className="text-base font-black text-slate-200 font-sans uppercase">Pilih Menu Pelayanan Surat ({LETTER_CATALOG.length} Surat)</h3>
                   </div>
-                  <span className="text-xs px-2.5 py-1 bg-slate-900 border border-slate-800 text-emerald-400 rounded-lg font-mono">
-                    NIK: {requesterNik}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs px-2.5 py-1 bg-slate-900 border border-slate-800 text-emerald-400 rounded-lg font-mono">
+                      NIK: {requesterNik}
+                    </span>
+                  </div>
                 </div>
 
-                {/* 3x3 Grid size */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                  {[
-                    { type: 'Surat Keterangan Domisili', desc: 'Bukti tempat tinggal tinggal warga' },
-                    { type: 'Surat Keterangan Usaha', desc: 'Pemenuhan modal jaminan usaha' },
-                    { type: 'Surat Keterangan Tidak Mampu (SKTM)', desc: 'Pengurusan biaya RS & sekolah' },
-                    { type: 'Surat Keterangan Kelahiran', desc: 'Pendataan anak lahir baru desa' },
-                    { type: 'Surat Keterangan Kematian', desc: 'Pencatatan akta kematian cepat' },
-                    { type: 'Surat Keterangan Pindah', desc: 'Surat pengunci mutasi keluar' },
-                    { type: 'Surat Pengantar Nikah', desc: 'Model NA rujukan penghulu KUA' },
-                    { type: 'Surat Izin Keramaian', desc: 'Rekomendasi keramaian polsek' },
-                    { type: 'Surat Keterangan Umum', desc: 'Kebutuhan administratif umum' }
-                  ].map((item) => (
-                    <button
-                      key={item.type}
-                      type="button"
-                      onClick={() => {
-                        playKioskSound('click');
-                        setSelectedType(item.type as LetterType);
-                        setKioskStep('fill-detail');
-                      }}
-                      className={`p-3 text-left border rounded-xl flex flex-col justify-between gap-2.5 transition-all active:scale-98 ${
-                        selectedType === item.type 
-                          ? 'bg-blue-600/20 border-blue-500 text-white shadow-lg' 
-                          : 'bg-slate-900 hover:bg-slate-800/80 border-slate-800 hover:border-slate-700'
-                      }`}
-                    >
-                      <div className="p-1 px-1.5 bg-slate-950/80 border border-slate-800 text-[8px] font-black font-mono text-sky-400 rounded w-max tracking-wide uppercase">
-                        BLANGKO AKTIF
-                      </div>
-                      <div>
-                        <h4 className="text-[11px] font-bold text-slate-200 truncate">{item.type}</h4>
-                        <p className="text-[9.5px] text-slate-500 mt-1 leading-normal line-clamp-2">{item.desc}</p>
-                      </div>
-                    </button>
-                  ))}
+                {/* Tactile Category Tab Selector & Touch Search Box */}
+                <div className="space-y-3 mb-4">
+                  <div className="flex flex-wrap gap-1.5 p-1 bg-slate-950 rounded-xl border border-slate-800">
+                    {[
+                      'Surat Izin',
+                      'Surat Keterangan',
+                      'Lainnya',
+                      'Surat Kuasa & Administrasi'
+                    ].map((cat) => (
+                      <button
+                        key={cat}
+                        type="button"
+                        onClick={() => {
+                          playKioskSound('click');
+                          setKioskCat(cat);
+                        }}
+                        className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase transition-all flex-grow sm:flex-grow-0 ${
+                          kioskCat === cat
+                            ? 'bg-blue-600 text-white shadow-md'
+                            : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                        }`}
+                      >
+                        {cat}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={kioskSearch}
+                      onChange={(e) => setKioskSearch(e.target.value)}
+                      placeholder='Cari pelayanan surat (Contoh: "pindah", "nikah", "izin suami")...'
+                      className="w-full bg-slate-950 text-xs text-white border border-slate-800 rounded-xl pl-4 pr-10 py-2.5 placeholder-slate-500 focus:border-blue-500 font-mono focus:ring-1 focus:ring-blue-500"
+                    />
+                    {kioskSearch && (
+                      <button
+                        type="button"
+                        onClick={() => setKioskSearch('')}
+                        className="absolute right-3.5 top-3 text-slate-500 hover:text-slate-300 text-xs font-bold"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Scrollable 3x3 Grid size */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 max-h-[300px] overflow-y-auto pr-1 select-none scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-transparent">
+                  {(() => {
+                    const filtered = LETTER_CATALOG.filter(t => {
+                      const matchesCat = t.category === kioskCat;
+                      const matchesSearch = t.name.toLowerCase().includes(kioskSearch.toLowerCase()) || 
+                                            t.code.toLowerCase().includes(kioskSearch.toLowerCase());
+                      return matchesCat && matchesSearch;
+                    });
+
+                    if (filtered.length === 0) {
+                      return (
+                        <div className="col-span-full text-center py-10 border border-dashed border-slate-800 rounded-xl text-slate-500 font-mono text-xs">
+                          Blangko layanan surat "{kioskSearch}" tidak ditemukan di kategori ini.
+                        </div>
+                      );
+                    }
+
+                    return filtered.map((item) => (
+                      <button
+                        key={item.name}
+                        type="button"
+                        onClick={() => {
+                          playKioskSound('click');
+                          handleKioskTypeSelect(item.name);
+                        }}
+                        className={`p-3 text-left border rounded-xl flex flex-col justify-between gap-1 transition-all active:scale-98 ${
+                          selectedType === item.name 
+                            ? 'bg-blue-600/20 border-blue-500 text-white shadow-lg' 
+                            : 'bg-slate-900 hover:bg-slate-800/80 border-slate-800 hover:border-slate-700'
+                        }`}
+                      >
+                        <div className="p-1 px-1.5 bg-slate-950/80 border border-slate-800 text-[8px] font-black font-mono text-cyan-400 rounded w-max tracking-wide uppercase">
+                          {item.code}
+                        </div>
+                        <div>
+                          <h4 className="text-[11px] font-bold text-slate-100 line-clamp-1">{item.name}</h4>
+                          <p className="text-[9px] text-slate-500 mt-0.5 leading-tight truncate">Isian: {item.fields.join(', ')}</p>
+                        </div>
+                      </button>
+                    ));
+                  })()}
                 </div>
               </div>
 
               {/* Bottom reset / back controls */}
-              <div className="border-t border-slate-800 pt-4 mt-6 flex justify-between">
+              <div className="border-t border-slate-800 pt-3 mt-4 flex justify-between">
                 <button
                   type="button"
                   onClick={() => {
                     playKioskSound('beep');
                     setKioskStep('welcome');
                   }}
-                  className="px-4 py-2 bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-300 rounded-lg text-xs font-bold flex items-center gap-1 transition-all"
+                  className="px-4 py-2 bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-300 rounded-lg text-xs font-bold flex items-center gap-1 transition-all font-mono"
                 >
                   <Undo size={12} />
-                  <span>KEMBALI</span>
+                  <span>KEMBALI KE DEPAN</span>
                 </button>
               </div>
             </div>
@@ -637,16 +725,47 @@ export default function KioskView({
                     />
                   </div>
 
+                  {/* Dynamic Fields for chosen template */}
+                  {(() => {
+                    const template = LETTER_CATALOG.find(t => t.name === selectedType);
+                    if (!template || template.fields.length === 0) return null;
+                    return (
+                      <div className="space-y-3 bg-slate-950/80 p-4 rounded-xl border border-slate-800">
+                        <p className="text-[10px] font-bold text-cyan-400 font-mono uppercase tracking-wider">
+                          Isian Blangko Tambahan ({template.code})*
+                        </p>
+                        {template.fields.map((field) => (
+                          <div key={field}>
+                            <label className="block text-[9.5px] font-bold text-slate-400 uppercase tracking-wider mb-1 font-mono">
+                              {field}*
+                            </label>
+                            <input
+                              type="text"
+                              value={dynamicFields[field] || ''}
+                              onChange={(e) => setDynamicFields(prev => ({
+                                ...prev,
+                                [field]: e.target.value
+                              }))}
+                              placeholder={`Masukkan ${field.toLowerCase()}...`}
+                              className="w-full bg-slate-900 border border-slate-800 focus:border-blue-500 text-white rounded-xl px-4 py-3 text-xs focus:ring-1 focus:ring-blue-500 transition-all font-semibold font-sans placeholder-slate-600"
+                              required
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+
                   <div>
                     <label className="block text-[9.5px] font-bold text-slate-400 uppercase tracking-wider mb-1 font-mono">Keperluan Khusus Pembuatan Surat*</label>
                     <textarea
                       value={keperluan}
                       onChange={(e) => setKeperluan(e.target.value)}
-                      rows={4}
-                      placeholder="Contoh: Mengurus pendaftaran bantuan kartu indonesia pintar (KIP), pendaftaran hak kelola usaha mikro atau mutasi pindah rumah kampung sebelah..."
+                      rows={3}
+                      placeholder="Contoh: Mengurus pendaftaran siswa baru, administrasi BPJS, lamaran kerja, dsb..."
                       className="w-full bg-slate-900 border border-slate-800 focus:border-blue-500 text-white rounded-xl px-4 py-3 text-xs focus:ring-1 focus:ring-blue-500 transition-all font-sans placeholder-slate-600 leading-relaxed"
                     />
-                    <span className="text-[9px] text-slate-500 font-mono mt-1 block">Silakan rincikan perihal keperluan tujuan administrasi dengan jujur dan benar demi kecepatan persetujuan aparat desa.</span>
+                    <span className="text-[9px] text-slate-500 font-mono mt-1 block font-sans">Silakan rincikan keperluan administrasi Anda secara benar demi kelancaran verifikasi mandiri aparat desa.</span>
                   </div>
                 </div>
               </div>

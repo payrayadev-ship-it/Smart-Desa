@@ -31,7 +31,7 @@ import {
 const VIEW_ROLES: Record<string, Role[]> = {
   'dashboard': ['Super Admin', 'Kepala Desa', 'Sekretaris', 'Bendahara', 'Operator', 'RT/RW'],
   'kependudukan': ['Super Admin', 'Kepala Desa', 'Sekretaris', 'Operator'],
-  'surat': ['Super Admin', 'Kepala Desa', 'Sekretaris', 'Operator', 'RT/RW'],
+  'surat': ['Super Admin', 'Kepala Desa', 'Sekretaris', 'Operator', 'RT/RW', 'Masyarakat'],
   'kiosk': ['Super Admin', 'Kepala Desa', 'Sekretaris', 'Operator', 'RT/RW'],
   'keuangan': ['Super Admin', 'Kepala Desa', 'Bendahara'],
   'bansos': ['Super Admin', 'Kepala Desa', 'Sekretaris', 'Operator', 'RT/RW'],
@@ -301,6 +301,31 @@ export default function App() {
     }
   };
 
+  const handleSyncAllDataToFirebase = async (): Promise<boolean> => {
+    try {
+      if (currentUser) {
+        await authenticateFirebaseUser(currentUser.name, activeRole, currentUser.nik);
+      }
+
+      await syncListToFirestoreBatch('residents', [], residents);
+      await syncListToFirestoreBatch('letters', [], letters);
+      await syncListToFirestoreBatch('finances', [], finances);
+      await syncListToFirestoreBatch('assets', [], assets);
+      await syncListToFirestoreBatch('complaints', [], complaints);
+      await syncListToFirestoreBatch('announcements', [], announcements);
+      await syncListToFirestoreBatch('agendas', [], agendas);
+      await syncListToFirestoreBatch('auditLogs', [], auditLogs);
+
+      await saveRecord('settings', 'villageProfile', villageProfile);
+      await saveRecord('settings', 'portalCredentials', portalCredentials);
+
+      return true;
+    } catch (error) {
+      console.error("Gagal sinkronisasi data massal ke Firebase:", error);
+      return false;
+    }
+  };
+
   // Logger helper
   const handleLogAction = (actionText: string, moduleName: string) => {
     const newLogItem: AuditLog = {
@@ -475,6 +500,7 @@ export default function App() {
                   activeRole={activeRole}
                   onLogAction={handleLogAction}
                   villageProfile={villageProfile}
+                  currentUser={currentUser}
                 />
               )}
 
@@ -562,6 +588,7 @@ export default function App() {
                   onLogAction={handleLogAction}
                   portalCredentials={portalCredentials}
                   savePortalCredentials={handleSavePortalCredentials}
+                  onSyncAllData={handleSyncAllDataToFirebase}
                 />
               )}
             </>

@@ -58,16 +58,7 @@ export interface Resident {
   updatedAt?: string;
 }
 
-export type LetterType = 
-  | 'Surat Keterangan Domisili'
-  | 'Surat Keterangan Usaha'
-  | 'Surat Keterangan Tidak Mampu (SKTM)'
-  | 'Surat Keterangan Kelahiran'
-  | 'Surat Keterangan Kematian'
-  | 'Surat Keterangan Pindah'
-  | 'Surat Pengantar Nikah'
-  | 'Surat Izin Keramaian'
-  | 'Surat Keterangan Umum';
+export type LetterType = string;
 
 export interface LetterTrackingLog {
   status: 'Diajukan' | 'Ditinjau' | 'Disetujui Kades' | 'Ditolak' | 'Selesai';
