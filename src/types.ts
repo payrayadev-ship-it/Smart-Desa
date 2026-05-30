@@ -79,6 +79,7 @@ export interface Letter {
   signedBy?: string;
   signedAt?: string;
   qrCodeDataUrl?: string;
+  queueNumber?: string;
   createdAt: string;
 }
 

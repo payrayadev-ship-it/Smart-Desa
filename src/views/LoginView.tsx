@@ -218,7 +218,7 @@ export default function LoginView({ onLoginSuccess, villageProfile }: LoginViewP
 
     if (!matchedCred) {
       playLoginSound('error');
-      setErrorMsg("Nama Sesuai Portal atau Sandi PIN salah! Silakan gunakan tombol Testing Instant atau hubungi Super Admin.");
+      setErrorMsg("Nama Sesuai Portal atau Sandi PIN salah! Silakan coba lagi atau hubungi Super Admin.");
       return;
     }
 
@@ -594,34 +594,7 @@ export default function LoginView({ onLoginSuccess, villageProfile }: LoginViewP
                     </div>
                   </div>
 
-                  {/* QUICK STAFF DEMO SWITCH BOARD */}
-                  <div className="bg-slate-950 p-3 rounded-xl border border-slate-800/50 space-y-2">
-                    <span className="text-[8.5px] font-mono text-blue-400 uppercase tracking-wider block font-bold">
-                      ⚡ TESTING INSTANT (klik salah satu akun untuk auto-fill nama & PIN dari database):
-                    </span>
-                    <div className="grid grid-cols-2 gap-1.5">
-                      {STAFF_DEMOS.map(s => {
-                        const isChosen = selectedStaffRole === s.role;
-                        const cred = portalCredentials.credentials.find(c => c.type === 'staf' && c.role === s.role);
-                        const currentName = cred ? cred.name : 'Belum Diatur';
-                        return (
-                          <button
-                            key={s.role}
-                            type="button"
-                            onClick={() => handleQuickStaffSelect(s.role)}
-                            className={`p-1.5 rounded text-left border text-[9.5px] transition-all truncate leading-tight ${
-                              isChosen 
-                                ? 'bg-blue-600/10 border-blue-500 text-white font-extrabold' 
-                                : 'bg-slate-900 hover:bg-slate-850 border-slate-800 text-slate-400'
-                            }`}
-                          >
-                            <div className="text-[9px] uppercase font-mono font-bold tracking-wide truncate">{s.role}</div>
-                            <div className="text-[8px] text-slate-500 truncate mt-0.5">{currentName}</div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
+
 
                   <button
                     type="submit"
@@ -676,37 +649,7 @@ export default function LoginView({ onLoginSuccess, villageProfile }: LoginViewP
                     </div>
                   </div>
 
-                  {/* QUICK CITIZEN QUICKLAUNCH BOARD */}
-                  <div className="bg-slate-950 p-3 rounded-xl border border-slate-800/50 space-y-2">
-                    <span className="text-[8.5px] font-mono text-blue-400 uppercase tracking-wider block font-bold">
-                      ⚡ TESTING AKUN WARGA (Klik salah satu untuk login instan):
-                    </span>
-                    <div className="grid grid-cols-1 gap-1.5">
-                      {CITIZEN_DEMOS.map(c => {
-                        const isChosen = nik === c.nik;
-                        return (
-                          <button
-                            key={c.nik}
-                            type="button"
-                            onClick={() => handleQuickWargaSelect(c.nik)}
-                            className={`p-2 rounded text-left border text-[10px] transition-all flex justify-between items-center ${
-                              isChosen 
-                                ? 'bg-blue-600/10 border-blue-500 text-white font-extrabold' 
-                                : 'bg-slate-900 hover:bg-slate-850 border-slate-800 text-slate-400'
-                            }`}
-                          >
-                            <div>
-                              <span className="font-semibold block">{c.name}</span>
-                              <span className="text-[8.5px] font-mono text-slate-500 block mt-0.5">NIK: {c.nik}</span>
-                            </div>
-                            <span className="text-[8.5px] font-mono bg-slate-950 px-1.5 py-0.5 rounded border border-slate-800 font-bold shrink-0">
-                              RT {c.rt}/RW {c.rw}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
+
 
                   <button
                     type="submit"

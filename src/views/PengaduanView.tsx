@@ -11,9 +11,12 @@ import {
   Clock,
   X,
   RefreshCw,
-  Eye
+  Eye,
+  Printer,
+  FileText,
+  FileDown
 } from 'lucide-react';
-import { CitizenComplaint, Role } from '../types';
+import { CitizenComplaint, Role, VillageProfile } from '../types';
 
 interface PengaduanViewProps {
   complaints: CitizenComplaint[];
@@ -21,6 +24,7 @@ interface PengaduanViewProps {
   activeRole: Role;
   onLogAction: (action: string, module: string) => void;
   currentUser?: { name: string; role: Role; nik?: string } | null;
+  villageProfile?: VillageProfile;
 }
 
 export default function PengaduanView({
@@ -28,7 +32,8 @@ export default function PengaduanView({
   saveComplaints,
   activeRole,
   onLogAction,
-  currentUser
+  currentUser,
+  villageProfile
 }: PengaduanViewProps) {
   const [complaints, setComplaints] = useState<CitizenComplaint[]>(initialComplaints);
   const [search, setSearch] = useState('');
@@ -57,6 +62,338 @@ export default function PengaduanView({
   const [aiDraftId, setAiDraftId] = useState<string | null>(null);
   const [aiResponseText, setAiResponseText] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
+
+  // Printing monthly report states
+  const [showPrintModal, setShowPrintModal] = useState(false);
+  const [selectedMonth, setSelectedMonth] = useState('Semua');
+  const [selectedYear, setSelectedYear] = useState('2026');
+  const [printFilterCat, setPrintFilterCat] = useState('Semua');
+  const [printFilterStat, setPrintFilterStat] = useState('Semua');
+
+  const handlePrintPDF = (selMonth: string, selYear: string, pCat: string, pStat: string) => {
+    // Filter complaints based on selections
+    const docs = complaints.filter(c => {
+      const dateObj = new Date(c.createdAt || c.date || Date.now());
+      const monthNames = [
+        "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+        "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+      ];
+      const complaintMonth = monthNames[dateObj.getMonth()];
+      const complaintYear = dateObj.getFullYear().toString();
+
+      const matchesMonth = selMonth === 'Semua' || complaintMonth === selMonth;
+      const matchesYear = selYear === 'Semua' || complaintYear === selYear;
+      const matchesCat = pCat === 'Semua' || c.category === pCat;
+      const matchesStat = pStat === 'Semua' || c.status === pStat;
+
+      return matchesMonth && matchesYear && matchesCat && matchesStat;
+    });
+
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) {
+      alert("Popup terblokir! Silakan aktifkan izin popup di browser Anda.");
+      return;
+    }
+
+    const mName = villageProfile?.name || "Desa Contoh";
+    const subdistrict = villageProfile?.subdistrict || "Kecamatan Contoh";
+    const regency = villageProfile?.regency || "Kabupaten Contoh";
+    const phone = villageProfile?.phone || "-";
+    const lKades = villageProfile?.kepalaDesa || "Kepala Desa";
+
+    const formattedDate = new Date().toLocaleDateString('id-ID', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric'
+    });
+
+    let tableRowsHtml = "";
+    docs.forEach((d, index) => {
+      const dDate = new Date(d.createdAt || d.date || Date.now()).toLocaleDateString('id-ID', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric'
+      });
+      tableRowsHtml += `
+        <tr>
+          <td style="text-align: center;">${index + 1}</td>
+          <td>${dDate}</td>
+          <td style="font-family: monospace;">${d.residentNik}</td>
+          <td><strong>${d.title}</strong></td>
+          <td>${d.category}</td>
+          <td>${d.description}</td>
+          <td>
+            <span class="status-badge status-${d.status.toLowerCase()}">${d.status}</span>
+            ${d.response ? `<div style="font-size: 10px; color: #4b5563; margin-top: 5px; border-top: 1px dashed #d1d5db; padding-top: 4px;"><strong>Tanggapan:</strong> ${d.response}</div>` : ''}
+          </td>
+        </tr>
+      `;
+    });
+
+    if (docs.length === 0) {
+      tableRowsHtml = `<tr><td colspan="7" style="text-align: center; color: #6b7280; font-style: italic; padding: 30px;">Tidak ada pengaduan warga tercatat untuk filter periode ini.</td></tr>`;
+    }
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Laporan Bulanan Pengaduan - ${mName}</title>
+          <style>
+            @media print {
+              body { margin: 1cm; font-size: 11px; }
+              @page { size: A4 portrait; margin: 1cm; }
+              .no-print { display: none !important; }
+            }
+            body { 
+              font-family: Arial, sans-serif; 
+              color: #111827; 
+              line-height: 1.4;
+              margin: 40px;
+            }
+            .kop-surat {
+              border-bottom: 3px double #000;
+              padding-bottom: 12px;
+              margin-bottom: 24px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+            }
+            .logo-placeholder {
+              width: 70px;
+              height: 70px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              border: 2px solid #111827;
+              border-radius: 9999px;
+              font-size: 9px;
+              text-align: center;
+              font-weight: bold;
+              margin-right: 20px;
+              text-transform: uppercase;
+              padding: 5px;
+            }
+            .kop-text {
+              text-align: center;
+              flex: 1;
+              padding-right: 40px;
+            }
+            .kop-text h1 {
+              font-size: 14px;
+              margin: 0;
+              font-weight: bold;
+              text-transform: uppercase;
+            }
+            .kop-text h2 {
+              font-size: 16px;
+              margin: 3px 0;
+              font-weight: bold;
+              text-transform: uppercase;
+            }
+            .kop-text h3 {
+              font-size: 18px;
+              margin: 0;
+              font-weight: bold;
+              text-transform: uppercase;
+            }
+            .kop-text p {
+              font-size: 10px;
+              margin: 4px 0 0 0;
+              color: #4b5563;
+              font-style: italic;
+            }
+            .report-title {
+              text-align: center;
+              margin-bottom: 25px;
+            }
+            .report-title h4 {
+              font-size: 14px;
+              text-decoration: underline;
+              margin: 0 0 5px 0;
+              font-weight: bold;
+              text-transform: uppercase;
+            }
+            .report-title p {
+              margin: 0;
+              font-size: 11px;
+              font-weight: bold;
+            }
+            .meta-info {
+              margin-bottom: 20px;
+              font-size: 11px;
+              width: 100%;
+              border-collapse: collapse;
+            }
+            .meta-info td {
+              padding: 4px 0;
+            }
+            .report-table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-bottom: 30px;
+              font-size: 10px;
+            }
+            .report-table th, .report-table td {
+              border: 1px solid #111827;
+              padding: 8px 6px;
+              vertical-align: top;
+            }
+            .report-table th {
+              background-color: #f3f4f6;
+              font-weight: bold;
+              text-align: center;
+              text-transform: uppercase;
+            }
+            .status-badge {
+              display: inline-block;
+              padding: 2px 5px;
+              border-radius: 3px;
+              font-size: 8px;
+              font-weight: bold;
+              text-transform: uppercase;
+            }
+            .status-diajukan { background: #fee2e2; color: #7f1d1d; border: 1px solid #fca5a5; }
+            .status-diproses { background: #dbeafe; color: #1e3a8a; border: 1px solid #93c5fd; }
+            .status-selesai { background: #d1fae5; color: #064e3b; border: 1px solid #6ee7b7; }
+            
+            .signature-section {
+              margin-top: 40px;
+              display: flex;
+              justify-content: flex-end;
+              font-size: 11px;
+              page-break-inside: avoid;
+            }
+            .signature-box {
+              text-align: center;
+              width: 250px;
+            }
+            .signature-box p {
+              margin: 0;
+            }
+            .signature-space {
+              height: 70px;
+            }
+            .signature-name {
+              font-weight: bold;
+              text-decoration: underline;
+            }
+            .print-btn-bar {
+              background: #0f172a;
+              padding: 14px;
+              border-bottom: 1px solid #1e293b;
+              display: flex;
+              justify-content: center;
+              gap: 12px;
+              position: fixed;
+              top: 0;
+              left: 0;
+              right: 0;
+              z-index: 1000;
+            }
+            .btn {
+              padding: 8px 18px;
+              font-size: 12px;
+              font-weight: bold;
+              border-radius: 6px;
+              cursor: pointer;
+              border: none;
+              text-transform: uppercase;
+              font-family: sans-serif;
+            }
+            .btn-primary { background: #10b981; color: #fff; }
+            .btn-secondary { background: #475569; color: #fff; }
+            
+            body {
+              margin-top: 80px;
+            }
+            @media print {
+              body { margin-top: 0px; }
+              .print-btn-bar { display: none !important; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="print-btn-bar no-print">
+            <button class="btn btn-primary" onclick="window.print()">Cetak Laporan / Simpan PDF</button>
+            <button class="btn btn-secondary" onclick="window.close()">Tutup Jendela</button>
+          </div>
+
+          <div class="kop-surat">
+            <div class="logo-placeholder">
+              PEMERINTAH<br/>DESA
+            </div>
+            <div class="kop-text">
+              <h1>PEMERINTAH KABUPATEN ${regency.toUpperCase()}</h1>
+              <h2>KECAMATAN ${subdistrict.toUpperCase()}</h2>
+              <h3>KANTOR KEPALA DESA ${mName.toUpperCase()}</h3>
+              <p>Sistem Management Informasi Desa Terpadu. Telepon: ${phone}. Email: cs-desa-${mName.toLowerCase().replace(/\s+/g, '')}@go.id</p>
+            </div>
+          </div>
+
+          <div class="report-title">
+            <h4>LAPORAN BULANAN PENGADUAN WARGA</h4>
+            <p>Periode Laporan: ${selMonth === 'Semua' ? 'Keseluruhan' : selMonth} ${selYear}</p>
+          </div>
+
+          <table class="meta-info">
+            <tr>
+              <td style="width: 140px;"><strong>Tanggal Cetak</strong></td>
+              <td style="width: 15px;">:</td>
+              <td style="width: 250px;">${formattedDate}</td>
+              <td style="width: 145px;"><strong>Filter Kategori</strong></td>
+              <td style="width: 15px;">:</td>
+              <td>${pCat}</td>
+            </tr>
+            <tr>
+              <td><strong>Pihak Sekretariat</strong></td>
+              <td>:</td>
+              <td>Balai Kantor Desa ${mName}</td>
+              <td><strong>Filter Status</strong></td>
+              <td>:</td>
+              <td>${pStat}</td>
+            </tr>
+            <tr>
+              <td><strong>Volume Pelaporan</strong></td>
+              <td>:</td>
+              <td>${docs.length} Berkas Keluhan Publik</td>
+              <td><strong>Keabsahan Laporan</strong></td>
+              <td>:</td>
+              <td>Arsip Fisik Kepala Desa</td>
+            </tr>
+          </table>
+
+          <table class="report-table">
+            <thead>
+              <tr>
+                <th style="width: 5%;">No</th>
+                <th style="width: 12%;">Tanggal</th>
+                <th style="width: 15%;">NIK Pelapor</th>
+                <th style="width: 22%;">Judul Laporan</th>
+                <th style="width: 13%;">Kategori</th>
+                <th>Uraian Pengaduan / Keluhan Warga</th>
+                <th style="width: 18%;">Status Laporan & Tindakan</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${tableRowsHtml}
+            </tbody>
+          </table>
+
+          <div class="signature-section">
+            <div class="signature-box">
+              <p>${mName}, ${formattedDate}</p>
+              <p style="margin-top: 5px; font-weight: bold; text-transform: uppercase;">MENGETAHUI,<br/>KEPALA DESA ${mName.toUpperCase()}</p>
+              <div class="signature-space"></div>
+              <p class="signature-name">${lKades}</p>
+              <p style="font-size: 10px; color: #4b5563; margin-top: 3px;">Arsip Desa ${mName}</p>
+            </div>
+          </div>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    onLogAction(`Mencetak arsip PDF bulanan pengaduan periode ${selMonth} ${selYear}`, 'Pengaduan');
+  };
 
   const handleSubmitComplaint = (e: React.FormEvent) => {
     e.preventDefault();
@@ -191,14 +528,29 @@ export default function PengaduanView({
           </div>
         </div>
 
-        <button
-          id="add-complaint-btn-trigger"
-          onClick={() => setShowForm(true)}
-          className="px-4 py-1.5 bg-amber-650 bg-amber-600 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow transition-all self-start"
-        >
-          <Plus size={14} />
-          <span>Laporkan Keluhan Warga</span>
-        </button>
+        <div className="flex flex-wrap items-center gap-2 self-start sm:self-center">
+          <button
+            id="print-complaint-report-btn"
+            onClick={() => {
+              // Prepopulate with matches if useful
+              setShowPrintModal(true);
+            }}
+            className="px-4 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-lg text-xs font-bold border border-emerald-300 flex items-center gap-1.5 shadow-sm transition-all"
+            title="Cetak Arsip Laporan Bulanan Kepala Desa"
+          >
+            <Printer size={14} className="text-emerald-700" />
+            <span>Cetak Arsip Laporan (PDF)</span>
+          </button>
+
+          <button
+            id="add-complaint-btn-trigger"
+            onClick={() => setShowForm(true)}
+            className="px-4 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow transition-all"
+          >
+            <Plus size={14} />
+            <span>Laporkan Keluhan Warga</span>
+          </button>
+        </div>
       </div>
 
       {/* FILTER PANEL */}
@@ -316,6 +668,192 @@ export default function PengaduanView({
               </div>
 
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MONTLHY PDF REPORT PRINT MODAL */}
+      {showPrintModal && (
+        <div id="print-report-modal" className="bg-slate-900/60 backdrop-blur-sm fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden border border-slate-100 flex flex-col max-h-[90vh]">
+            
+            {/* Modal Header */}
+            <div className="bg-emerald-700 text-white p-4 flex justify-between items-center text-xs font-bold font-mono tracking-wider shrink-0">
+              <span className="flex items-center gap-2">
+                <Printer size={16} />
+                <span>FORMULIR ARSIP DOKUMEN FISIK BULANAN KEPALA DESA</span>
+              </span>
+              <button 
+                id="close-print-modal" 
+                onClick={() => setShowPrintModal(false)} 
+                className="text-emerald-100 hover:text-white transition"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 overflow-y-auto space-y-4 grid grid-cols-1 md:grid-cols-2 gap-5">
+              
+              {/* Form Config Side */}
+              <div className="space-y-3">
+                <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider font-mono border-b pb-1.5 border-slate-100">
+                  Parameter Pencetakan
+                </h3>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 font-mono">Bulan Laporan</label>
+                  <select
+                    id="print-month-select"
+                    value={selectedMonth}
+                    onChange={(e) => setSelectedMonth(e.target.value)}
+                    className="w-full text-xs p-2.5 border border-slate-200 rounded-lg bg-slate-50 font-bold text-slate-800"
+                  >
+                    <option value="Semua">Semua Bulan Laporan</option>
+                    <option value="Januari">Januari</option>
+                    <option value="Februari">Februari</option>
+                    <option value="Maret">Maret</option>
+                    <option value="April">April</option>
+                    <option value="Mei">Mei</option>
+                    <option value="Juni">Juni</option>
+                    <option value="Juli">Juli</option>
+                    <option value="Agustus">Agustus</option>
+                    <option value="September">September</option>
+                    <option value="Oktober">Oktober</option>
+                    <option value="November">November</option>
+                    <option value="Desember">Desember</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 font-mono">Tahun Laporan</label>
+                  <select
+                    id="print-year-select"
+                    value={selectedYear}
+                    onChange={(e) => setSelectedYear(e.target.value)}
+                    className="w-full text-xs p-2.5 border border-slate-200 rounded-lg bg-slate-50 font-mono text-slate-800"
+                  >
+                    <option value="2026">2026</option>
+                    <option value="2025">2025</option>
+                    <option value="2024">2024</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 font-mono">Filter Kategori</label>
+                  <select
+                    id="print-category-select"
+                    value={printFilterCat}
+                    onChange={(e) => setPrintFilterCat(e.target.value)}
+                    className="w-full text-xs p-2.5 border border-slate-200 rounded-lg bg-slate-50 font-bold text-slate-700"
+                  >
+                    <option value="Semua">Semua Kategori Keluhan</option>
+                    <option value="Infrastruktur">Infrastruktur & Jalan</option>
+                    <option value="Sampah & Kebersihan">Sampah & Kebersihan Lingkungan</option>
+                    <option value="Bantuan Sosial">Bantuan Sosial & BLT</option>
+                    <option value="Keamanan">Keamanan & Pos Ronda</option>
+                    <option value="Pelayanan">Pemerintahan & Pelayanan</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 font-mono">Filter Status</label>
+                  <select
+                    id="print-status-select"
+                    value={printFilterStat}
+                    onChange={(e) => setPrintFilterStat(e.target.value)}
+                    className="w-full text-xs p-2.5 border border-slate-200 rounded-lg bg-slate-50 font-bold text-slate-700"
+                  >
+                    <option value="Semua">Semua Status Keluhan</option>
+                    <option value="Diajukan">Diajukan</option>
+                    <option value="Diproses">Diproses</option>
+                    <option value="Selesai">Selesai</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Simulation/Stats Panel */}
+              <div className="bg-slate-50 rounded-xl border border-slate-200 p-4 flex flex-col justify-between">
+                <div>
+                  <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider font-mono border-b pb-1.5 border-slate-200 mb-2.5 flex items-center justify-between">
+                    <span>Pratinjau Berkas</span>
+                    <span className="text-[10px] px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full font-mono uppercase font-black">
+                      Ready
+                    </span>
+                  </h3>
+
+                  <div className="bg-white border rounded-lg p-3 text-[10px] text-slate-400 font-mono shadow-inner space-y-2">
+                    <div className="text-center font-bold border-b pb-1 text-slate-600 uppercase">
+                      KOP KANTOR DESA {villageProfile?.name || "CONTOH"}
+                    </div>
+                    <div className="font-sans text-xs text-slate-800 font-black text-center mt-1">
+                      LAPORAN BULANAN PENGADUAN WARGA
+                    </div>
+                    <div className="flex justify-between border-t border-slate-100 pt-1.5 text-slate-500">
+                      <span>Bulan Laporan:</span>
+                      <span className="text-slate-800 font-bold">{selectedMonth} {selectedYear}</span>
+                    </div>
+                    <div className="flex justify-between text-slate-500">
+                      <span>Kategori:</span>
+                      <span className="text-slate-700 font-bold">{printFilterCat}</span>
+                    </div>
+                    <div className="flex justify-between text-slate-500">
+                      <span>Status:</span>
+                      <span className="text-slate-700 font-bold">{printFilterStat}</span>
+                    </div>
+                    <div className="flex justify-between text-slate-500 border-t border-dashed pt-1 mt-1 font-bold">
+                      <span className="text-slate-600">Total Berkas Keluhan:</span>
+                      <span className="text-emerald-700 text-xs font-extrabold">
+                        {complaints.filter(c => {
+                          const dateObj = new Date(c.createdAt || c.date || Date.now());
+                          const monthNames = [
+                            "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+                            "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+                          ];
+                          const complaintMonth = monthNames[dateObj.getMonth()];
+                          const complaintYear = dateObj.getFullYear().toString();
+
+                          const matchesMonth = selectedMonth === 'Semua' || complaintMonth === selectedMonth;
+                          const matchesYear = selectedYear === 'Semua' || complaintYear === selectedYear;
+                          const matchesCat = printFilterCat === 'Semua' || c.category === printFilterCat;
+                          const matchesStat = printFilterStat === 'Semua' || c.status === printFilterStat;
+
+                          return matchesMonth && matchesYear && matchesCat && matchesStat;
+                        }).length} Item
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="mt-3.5 bg-amber-50 border border-amber-200 rounded-lg p-3 text-[10.5px] text-amber-900 leading-relaxed">
+                    <p className="font-bold">⚠️ Panduan Arsip Fisik:</p>
+                    <p className="mt-1 font-sans">Laporan ini memuat rekapitulasi pelaporan dari warga untuk diarsipkan secara fisik oleh Kepala Desa sebagai bahan audit mingguan/bulanan.</p>
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setShowPrintModal(false)}
+                    className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-xs font-semibold font-mono"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handlePrintPDF(selectedMonth, selectedYear, printFilterCat, printFilterStat);
+                      setShowPrintModal(false);
+                    }}
+                    className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow flex items-center gap-1.5"
+                  >
+                    <Printer size={13} />
+                    <span>Lanjutkan Cetak PDF</span>
+                  </button>
+                </div>
+
+              </div>
+
+            </div>
           </div>
         </div>
       )}

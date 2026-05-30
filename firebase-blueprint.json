@@ -37,15 +37,16 @@
       "type": "object",
       "properties": {
         "id": { "type": "string" },
-        "nik": { "type": "string" },
-        "namaPemohon": { "type": "string" },
-        "jenisSurat": { "type": "string" },
-        "tanggalPengajuan": { "type": "string" },
+        "letterNumber": { "type": "string" },
+        "type": { "type": "string" },
+        "requesterName": { "type": "string" },
+        "requesterNik": { "type": "string" },
+        "rtApproval": { "type": "boolean" },
         "status": { "type": "string" },
-        "keterangan": { "type": "string" },
-        "diinputDari": { "type": "string" }
+        "createdAt": { "type": "string" },
+        "queueNumber": { "type": "string" }
       },
-      "required": ["id", "nik", "namaPemohon", "jenisSurat", "status"]
+      "required": ["id", "type", "requesterName", "requesterNik", "status"]
     },
     "Finance": {
       "title": "Finance",

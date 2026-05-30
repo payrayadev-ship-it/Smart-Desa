@@ -13,6 +13,7 @@ import PengaduanView from './views/PengaduanView';
 import PelayananWargaView from './views/PelayananWargaView';
 import WebDesaView from './views/WebDesaView';
 import KioskView from './views/KioskView';
+import KioskMonitorView from './views/KioskMonitorView';
 
 import { Role, Resident, Letter, FinanceTransaction, VillageAsset, Complaint, VillageAnnouncement, VillageAgenda, AuditLog, VillageProfile, PortalCredential } from './types';
 import { INITIAL_VILLAGE_PROFILE, LocalDb, INITIAL_PORTAL_CREDENTIALS } from './mockData';
@@ -32,7 +33,8 @@ const VIEW_ROLES: Record<string, Role[]> = {
   'dashboard': ['Super Admin', 'Kepala Desa', 'Sekretaris', 'Bendahara', 'Operator', 'RT/RW'],
   'kependudukan': ['Super Admin', 'Kepala Desa', 'Sekretaris', 'Operator'],
   'surat': ['Super Admin', 'Kepala Desa', 'Sekretaris', 'Operator', 'RT/RW', 'Masyarakat'],
-  'kiosk': ['Super Admin', 'Kepala Desa', 'Sekretaris', 'Operator', 'RT/RW'],
+  'kiosk': ['Super Admin', 'Kepala Desa', 'Sekretaris', 'Operator', 'RT/RW', 'Masyarakat'],
+  'kiosk-monitor': ['Super Admin', 'Kepala Desa', 'Sekretaris', 'Bendahara', 'Operator', 'RT/RW', 'Masyarakat'],
   'keuangan': ['Super Admin', 'Kepala Desa', 'Bendahara'],
   'bansos': ['Super Admin', 'Kepala Desa', 'Sekretaris', 'Operator', 'RT/RW'],
   'aset': ['Super Admin', 'Kepala Desa', 'Sekretaris', 'Operator'],
@@ -45,6 +47,19 @@ const VIEW_ROLES: Record<string, Role[]> = {
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<{ name: string; role: Role; nik?: string } | null>(() => {
+    if (
+      window.location.search.includes('view=kiosk-monitor') || 
+      window.location.hash === '#kiosk-monitor' || 
+      window.location.search.includes('monitor=true')
+    ) {
+      return { name: "Layar Monitor Antrean Lobby", role: "Masyarakat", nik: "0000000000000000" };
+    }
+    if (
+      window.location.search.includes('view=kiosk') || 
+      window.location.hash === '#kiosk'
+    ) {
+      return { name: "Anjungan Kiosk Warga", role: "Masyarakat", nik: "0000000000000000" };
+    }
     const saved = localStorage.getItem('smart_desa_user');
     if (saved) {
       try {
@@ -57,6 +72,15 @@ export default function App() {
   });
 
   const [activeRole, setActiveRole] = useState<Role>(() => {
+    if (
+      window.location.search.includes('view=kiosk-monitor') || 
+      window.location.hash === '#kiosk-monitor' || 
+      window.location.search.includes('monitor=true') ||
+      window.location.search.includes('view=kiosk') || 
+      window.location.hash === '#kiosk'
+    ) {
+      return 'Masyarakat';
+    }
     const saved = localStorage.getItem('smart_desa_user');
     if (saved) {
       try {
@@ -70,6 +94,19 @@ export default function App() {
   });
 
   const [currentView, setView] = useState(() => {
+    if (
+      window.location.search.includes('view=kiosk-monitor') || 
+      window.location.hash === '#kiosk-monitor' || 
+      window.location.search.includes('monitor=true')
+    ) {
+      return 'kiosk-monitor';
+    }
+    if (
+      window.location.search.includes('view=kiosk') || 
+      window.location.hash === '#kiosk'
+    ) {
+      return 'kiosk';
+    }
     const saved = localStorage.getItem('smart_desa_user');
     if (saved) {
       try {
@@ -408,6 +445,43 @@ export default function App() {
     syncListToFirestore('agendas', agendas, data);
   };
 
+  if (currentView === 'kiosk-monitor') {
+    return (
+      <KioskMonitorView 
+        letters={letters}
+        villageProfile={villageProfile}
+        onNavigateClose={() => {
+          // Clear URL query parameters to return to normal system
+          window.location.hash = '';
+          const url = new URL(window.location.href);
+          url.searchParams.delete('view');
+          url.searchParams.delete('monitor');
+          window.location.href = url.pathname;
+        }}
+      />
+    );
+  }
+
+  if (currentView === 'kiosk') {
+    return (
+      <div className="bg-slate-950 min-h-screen text-slate-100 flex flex-col justify-between overflow-hidden relative select-none">
+        <KioskView 
+          letters={letters}
+          saveLetters={handleSaveLetters}
+          onLogAction={handleLogAction}
+          villageProfile={villageProfile}
+          onNavigateClose={() => {
+            // Clear URL query parameters to return to normal system
+            window.location.hash = '';
+            const url = new URL(window.location.href);
+            url.searchParams.delete('view');
+            window.location.href = url.pathname;
+          }}
+        />
+      </div>
+    );
+  }
+
   if (!currentUser) {
     return (
       <LoginView 
@@ -551,6 +625,7 @@ export default function App() {
                   activeRole={activeRole}
                   onLogAction={handleLogAction}
                   currentUser={currentUser}
+                  villageProfile={villageProfile}
                 />
               )}
 

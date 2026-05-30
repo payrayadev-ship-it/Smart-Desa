@@ -17,7 +17,8 @@ import {
   FileCheck2,
   Ticket,
   ChevronRight,
-  Info
+  Info,
+  LogOut
 } from 'lucide-react';
 import { Letter, LetterType, Role, VillageProfile } from '../types';
 import KtpScanner from '../components/KtpScanner';
@@ -28,13 +29,15 @@ interface KioskViewProps {
   saveLetters: (letters: Letter[]) => void;
   onLogAction: (action: string, module: string) => void;
   villageProfile: VillageProfile;
+  onNavigateClose?: () => void;
 }
 
 export default function KioskView({
   letters,
   saveLetters,
   onLogAction,
-  villageProfile
+  villageProfile,
+  onNavigateClose
 }: KioskViewProps) {
   // Navigation steps inside kiosk: 'welcome' | 'select-service' | 'fill-detail' | 'success-print'
   const [kioskStep, setKioskStep] = useState<'welcome' | 'select-service' | 'fill-detail' | 'success-print'>('welcome');
@@ -180,7 +183,7 @@ export default function KioskView({
     }
 
     const uniqueId = `LTR-${Date.now().toString().slice(-6)}`;
-    const randomTicketNo = `A-${Math.floor(100 + Math.random() * 900)}`;
+    const randomTicketNo = `A-${Math.floor(100 + Math.random() * 950)}`;
 
     const newLetterItem: Letter = {
       id: uniqueId,
@@ -190,9 +193,11 @@ export default function KioskView({
       requesterNik: requesterNik,
       status: 'Diajukan',
       rtApproval: false,
+      queueNumber: randomTicketNo,
       fields: {
         "Keperluan Warga": keperluan,
         "Diinput Melalui": "Anjungan Kiosk Mandiri Kantor Desa",
+        "Nomor Karcis / Antrean": randomTicketNo,
         ...dynamicFields
       },
       trackingLogs: [
@@ -316,7 +321,44 @@ export default function KioskView({
         </div>
 
         {/* Lobby Watch & Sound toggles */}
-        <div className="flex items-center space-x-4">
+        <div className="flex items-center space-x-3 sm:space-x-4">
+          <button 
+            id="header-scan-ktp-btn"
+            type="button" 
+            onClick={() => {
+              playKioskSound('click');
+              setShowScanner(true);
+            }} 
+            className="p-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl border border-blue-400 font-mono text-xs flex items-center gap-1.5 transition-all shadow-md shadow-blue-600/20 font-bold"
+          >
+            <Camera size={15} className="text-white animate-pulse" />
+            <span>Scan KTP</span>
+          </button>
+
+          <button 
+            type="button" 
+            onClick={() => {
+              playKioskSound('click');
+              window.open(window.location.origin + window.location.pathname + '?view=kiosk-monitor', '_blank');
+            }} 
+            className="p-2.5 bg-indigo-950/60 hover:bg-indigo-900/80 hover:text-white text-indigo-400 rounded-xl border border-indigo-500/40 font-mono text-xs flex items-center gap-1.5 transition-all shadow-md shadow-indigo-600/10"
+          >
+            <Monitor size={15} className="text-indigo-400" />
+            <span className="font-bold">BUKA DISPLAY TV LOBBY</span>
+          </button>
+
+          <button 
+            type="button" 
+            onClick={() => {
+              playKioskSound('click');
+              window.open(window.location.origin + window.location.pathname + '?view=kiosk', '_blank');
+            }} 
+            className="p-2.5 bg-emerald-950/60 hover:bg-emerald-900/80 hover:text-white text-emerald-400 rounded-xl border border-emerald-500/40 font-mono text-xs flex items-center gap-1.5 transition-all shadow-md shadow-emerald-600/10"
+          >
+            <Monitor size={15} className="text-emerald-400" />
+            <span className="font-bold">BUKA KIOSK JENDELA BARU</span>
+          </button>
+
           <button 
             type="button" 
             onClick={() => setSoundEnabled(!soundEnabled)} 
@@ -339,6 +381,18 @@ export default function KioskView({
             <Clock size={14} className="text-sky-400 animate-spin" style={{ animationDuration: '4s' }} />
             <span>{currentTime.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })} WIB</span>
           </div>
+
+          {onNavigateClose && (
+            <button 
+              type="button" 
+              onClick={onNavigateClose}
+              className="p-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl flex items-center gap-1.5 transition text-xs font-mono font-bold uppercase shadow-lg shadow-rose-600/10"
+              title="Keluar"
+            >
+              <LogOut size={13} />
+              <span>Keluar</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -476,6 +530,7 @@ export default function KioskView({
                   </div>
 
                   <button
+                    id="welcome-scan-ktp-btn"
                     type="button"
                     onClick={() => {
                       playKioskSound('click');
@@ -484,7 +539,7 @@ export default function KioskView({
                     className="w-full py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-md shadow-blue-600/20"
                   >
                     <Camera size={16} />
-                    <span>LUNCURKAN SENSOR KAMERA</span>
+                    <span>Scan KTP</span>
                   </button>
                 </div>
 
