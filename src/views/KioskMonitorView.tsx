@@ -290,6 +290,239 @@ export default function KioskMonitorView({
     }, 1200);
   };
 
+  const handleExportExcel = () => {
+    playSuccessBeep();
+    // Generate HTML colored spreadsheet representable as Excel
+    const excelHeader = `
+      <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+      <head>
+        <meta charset="utf-8" />
+        <!--[if gte mso 9]>
+        <xml>
+          <x:ExcelWorkbook>
+            <x:ExcelWorksheets>
+              <x:ExcelWorksheet>
+                <x:Name>Log Antrean Kiosk</x:Name>
+                <x:WorksheetOptions>
+                  <x:DisplayGridlines/>
+                </x:WorksheetOptions>
+              </x:ExcelWorksheet>
+            </x:ExcelWorksheets>
+          </x:ExcelWorkbook>
+        </xml>
+        <![endif]-->
+        <style>
+          table { border-collapse: collapse; width: 100%; font-family: sans-serif; }
+          th { background-color: #4f46e5; color: #ffffff; font-weight: bold; padding: 10px; border: 1px solid #cbd5e1; }
+          td { padding: 8px; border: 1px solid #cbd5e1; text-align: left; }
+          .title { font-size: 16px; font-weight: bold; text-align: center; margin-bottom: 20px; color: #1e1b4b; }
+          .meta { font-size: 11px; color: #475569; margin-bottom: 15px; line-height: 1.5; }
+          .badge { padding: 4px 8px; border-radius: 4px; font-weight: bold; text-align: center; font-size: 10px; }
+          .badge-Diajukan { background-color: #dbeafe; color: #1e40af; }
+          .badge-Ditinjau { background-color: #ffedd5; color: #9a3412; }
+          .badge-Selesai { background-color: #d1fae5; color: #065f46; }
+          .badge-Disetujui { background-color: #d1fae5; color: #065f46; }
+        </style>
+      </head>
+      <body>
+        <div class="title">LAPORAN AUDIT BULANAN LOG ANTREAN KIOSK MANDIRI - DESA ${villageProfile.name.toUpperCase()}</div>
+        <div class="meta">
+          <strong>Kecamatan:</strong> ${villageProfile.subdistrict} &nbsp;&nbsp;|&nbsp;&nbsp;
+          <strong>Kabupaten:</strong> ${villageProfile.regency} &nbsp;&nbsp;|&nbsp;&nbsp;
+          <strong>Provinsi:</strong> ${villageProfile.province}<br/>
+          <strong>Dicetak pada:</strong> ${new Date().toLocaleDateString('id-ID', {day: 'numeric', month: 'long', year: 'numeric'})} pukul ${new Date().toLocaleTimeString('id-ID')} WIB<br/>
+          <strong>Total Transaksi Antrean Kiosk:</strong> ${kioskLetters.length} berkas pemohon terdaftar
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 5%;">No</th>
+              <th style="width: 12%;">Kode Antrean</th>
+              <th style="width: 20%;">Nama Pemohon</th>
+              <th style="width: 15%;">NIK Pemohon</th>
+              <th style="width: 20%;">Jenis Pelayanan / Surat</th>
+              <th style="width: 18%;">Tempat, Tanggal Lahir</th>
+              <th style="width: 10%;">Status Berkas</th>
+              <th style="width: 15%;">Waktu Pengajuan</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${kioskLetters.map((letItem, idx) => {
+              const queueNo = letItem.queueNumber || letItem.fields?.["Kode Antrean"] || `A-${letItem.id.slice(-3)}`;
+              const birthplace = letItem.fields?.['Tempat Lahir'] || '-';
+              const birthdate = letItem.fields?.['Tanggal Lahir'] ? new Date(letItem.fields?.['Tanggal Lahir']).toLocaleDateString('id-ID') : '-';
+              const mainStatus = letItem.status.includes('Disetujui') || letItem.status === 'Selesai' ? 'Selesai' : letItem.status;
+              
+              return `
+                <tr>
+                  <td style="text-align: center;">${idx + 1}</td>
+                  <td style="font-family: monospace; font-weight: bold; text-align: center; background-color: #f8fafc; color: #1e3a8a;">${queueNo}</td>
+                  <td style="font-weight: bold; text-transform: uppercase;">${letItem.requesterName}</td>
+                  <td style="font-family: monospace;">'${letItem.requesterNik}</td>
+                  <td>${letItem.type}</td>
+                  <td>${birthplace}, ${birthdate}</td>
+                  <td class="badge-${mainStatus}" style="text-align: center; font-weight: bold;">${letItem.status}</td>
+                  <td>${new Date(letItem.createdAt).toLocaleString('id-ID')} WIB</td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      </body>
+      </html>
+    `;
+
+    const blob = new Blob([excelHeader], { type: 'application/vnd.ms-excel;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Audit_Log_Kiosk_Desa_${villageProfile.name.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0,10)}.xls`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleExportPDF = () => {
+    playSuccessBeep();
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      alert("Popup terblokir browser! Mohon izinkan popup untuk mencetak laporan.");
+      return;
+    }
+
+    const documentContent = `
+      <html>
+        <head>
+          <title>LAPORAN AUDIT LOG ANTREAN KIOSK - DESA ${villageProfile.name.toUpperCase()}</title>
+          <style>
+            body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 40px; color: #1e293b; line-height: 1.5; font-size: 13px; background-color: #ffffff; }
+            .kop-container { border-bottom: 3px double #000000; padding-bottom: 12px; margin-bottom: 25px; display: flex; align-items: center; gap: 20px; }
+            .kop-text { flex-grow: 1; text-align: center; }
+            .kop-title { font-size: 16px; font-weight: 900; letter-spacing: 0.1em; text-transform: uppercase; margin: 0; }
+            .kop-sub { font-size: 11px; margin: 5px 0 0 0; color: #475569; letter-spacing: 0.05em; font-weight: 500; }
+            
+            .report-title { text-align: center; font-size: 14px; font-weight: bold; text-decoration: underline; text-transform: uppercase; margin-bottom: 5px; color: #0f172a; }
+            .report-subtitle { text-align: center; font-size: 10px; font-family: monospace; color: #64748b; margin-bottom: 25px; text-transform: uppercase; letter-spacing: 0.1em; }
+            
+            .info-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; background-color: #f8fafc; padding: 12px; border-radius: 10px; border: 1px solid #f1f5f9; }
+            .info-meta p { margin: 3px 0; font-size: 11px; }
+            .info-meta strong { color: #0f172a; }
+
+            table { border-collapse: collapse; width: 100%; font-size: 11px; margin-top: 15px; }
+            th { background-color: #0f172a; color: #ffffff; font-weight: bold; padding: 8px 10px; border: 1px solid #cbd5e1; text-align: left; text-transform: uppercase; font-size: 10px; font-family: monospace; }
+            td { padding: 7px 10px; border: 1px solid #e2e8f0; text-align: left; vertical-align: top; }
+            tr:nth-child(even) td { background-color: #f8fafc; }
+            
+            .badge { padding: 2px 6px; border-radius: 4px; font-weight: bold; font-family: monospace; font-size: 9px; display: inline-block; text-transform: uppercase; }
+            .badge-Diajukan { background-color: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; }
+            .badge-Ditinjau { background-color: #fff7ed; color: #c2410c; border: 1px solid #ffedd5; }
+            .badge-Selesai { background-color: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
+            .badge-Disetujui { background-color: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
+
+            .signature-block { margin-top: 40px; float: right; width: 230px; text-align: center; font-size: 12px; page-break-inside: avoid; }
+            .signature-space { height: 75px; }
+            .footer-notes { margin-top: 50px; font-size: 9px; color: #94a3b8; font-family: monospace; text-align: center; border-top: 1px dashed #cbd5e1; padding-top: 15px; }
+            
+            @media print {
+              body { padding: 0; font-size: 12px; }
+              .no-print { display: none; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="kop-container">
+            ${villageProfile.logoUrl ? `<img src="${villageProfile.logoUrl}" style="width: 55px; height: 55px; object-fit: contain;" referrerPolicy="no-referrer" />` : `<div style="width:55px;height:55px;border:1px solid #bbb;border-radius:6px;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:10px;">PEMDA</div>`}
+            <div class="kop-text">
+              <h1 class="kop-title">Pemerintah Kabupaten ${villageProfile.regency}</h1>
+              <h2 class="kop-title" style="font-size: 14px; color: #334155; margin-top: 2px;">Kantor Kepala Desa ${villageProfile.name}</h2>
+              <p class="kop-sub">Alamat: ${villageProfile.address || '-'} | Telp: ${villageProfile.phone || '-'} | Email: ${villageProfile.email || '-'}</p>
+            </div>
+          </div>
+
+          <h2 class="report-title">LAPORAN REKAPITULASI AUDIT LOG ANTREAN KIOSK</h2>
+          <p class="report-subtitle">DATA TRANSAKSI BULANAN - ANJUNGAN PELAYANAN DESA MANDIRI</p>
+
+          <div class="info-meta">
+            <div>
+              <p><strong>Desa / Kelurahan:</strong> ${villageProfile.name}</p>
+              <p><strong>Kecamatan:</strong> ${villageProfile.subdistrict}</p>
+              <p><strong>Kabupaten / Kota:</strong> ${villageProfile.regency}</p>
+            </div>
+            <div>
+              <p><strong>Tanggal Cetak Laporan:</strong> ${new Date().toLocaleDateString('id-ID', {day: 'numeric', month: 'long', year: 'numeric'})}</p>
+              <p><strong>Waktu Download:</strong> ${new Date().toLocaleTimeString('id-ID')} WIB</p>
+              <p><strong>Total Log Berkas Kiosk:</strong> ${kioskLetters.length} Transaksi</p>
+            </div>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 4%; text-align: center;">No</th>
+                <th style="width: 12%; text-align: center;">Kode Antrean</th>
+                <th style="width: 18%;">Nama Pemohon</th>
+                <th style="width: 14%;">NIK Pemohon</th>
+                <th style="width: 18%;">Jenis Layanan / Surat</th>
+                <th style="width: 16%;">Tempat & Tanggal Lahir</th>
+                <th style="width: 10%; text-align: center;">Status</th>
+                <th style="width: 8%; text-align: center;">Tanggal</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${kioskLetters.map((letItem, idx) => {
+                const qNo = letItem.queueNumber || letItem.fields?.["Kode Antrean"] || `A-${letItem.id.slice(-3)}`;
+                const birthplace = letItem.fields?.['Tempat Lahir'] || '-';
+                const birthdate = letItem.fields?.['Tanggal Lahir'] ? new Date(letItem.fields?.['Tanggal Lahir']).toLocaleDateString('id-ID') : '-';
+                const mainStatus = letItem.status.includes('Disetujui') || letItem.status === 'Selesai' ? 'Selesai' : letItem.status;
+                return `
+                  <tr>
+                    <td style="text-align: center;">${idx + 1}</td>
+                    <td style="font-family: monospace; font-weight: bold; text-align: center; color: #1e3a8a;">${qNo}</td>
+                    <td style="font-weight: bold; text-transform: uppercase;">${letItem.requesterName}</td>
+                    <td style="font-family: monospace;">${letItem.requesterNik}</td>
+                    <td>${letItem.type}</td>
+                    <td>${birthplace}, ${birthdate}</td>
+                    <td style="text-align: center;">
+                      <span class="badge badge-${mainStatus}">${letItem.status}</span>
+                    </td>
+                    <td style="text-align: center; font-family: monospace; white-space: nowrap;">${new Date(letItem.createdAt).toLocaleDateString('id-ID', {day:'numeric', month:'numeric'})}</td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+
+          <div class="signature-block">
+            <p>${villageProfile.name}, ${new Date().toLocaleDateString('id-ID', {day: 'numeric', month: 'long', year: 'numeric'})}</p>
+            <p style="font-weight: bold; margin-top: 5px;">Kepala Desa ${villageProfile.name}</p>
+            <div class="signature-space"></div>
+            <p style="font-weight: bold; text-decoration: underline;">${villageProfile.kepalaDesa || "H. Dadang Sulaeman, S.IP."}</p>
+            <p style="font-size: 10px; color: #64748b;">NIP. 19740512 200212 1 003</p>
+          </div>
+
+          <div style="clear: both;"></div>
+
+          <div class="footer-notes">
+            Laporan ini dibuat secara otomatis oleh modul Kiosk Monitor TV Desa ${villageProfile.name} pada ${new Date().toLocaleString('id-ID')} WIB.<br/>
+            Segala bentuk manipulasi data log audit akan terekam oleh sistem pengawasan keamanan digital pemerintahan.
+          </div>
+
+          <script>
+            window.addEventListener('load', () => {
+              setTimeout(() => {
+                window.print();
+              }, 400);
+            });
+          </script>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(documentContent);
+    printWindow.document.close();
+  };
+
   return (
     <div className="bg-slate-950 text-white min-h-screen font-sans flex flex-col justify-between overflow-hidden relative select-none">
       
@@ -344,6 +577,39 @@ export default function KioskMonitorView({
             <ScanLine size={14} className="animate-pulse text-slate-950" />
             <span>KAMERA SCAN QR BERKAS</span>
           </button>
+
+          {/* Export Audit Log Dropdown */}
+          <div className="relative group">
+            <button
+              type="button"
+              className="p-2 px-3.5 bg-gradient-to-r from-indigo-600 to-indigo-800 hover:from-indigo-500 hover:to-indigo-700 text-white font-bold rounded-xl text-xs flex items-center gap-2 transition-all shadow-md border border-indigo-400/20 tracking-wider active:scale-95"
+            >
+              <Download size={14} className="text-white animate-bounce" />
+              <span>LOG AUDIT KIOSK</span>
+            </button>
+            <div className="absolute right-0 mt-2 w-56 bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl scale-0 group-hover:scale-100 origin-top-right transition-all duration-150 z-30 divide-y divide-slate-800/60">
+              <div className="px-4 py-2.5 bg-slate-950/60 text-left">
+                <p className="text-[10px] font-bold text-slate-400 font-mono tracking-widest uppercase">Pilihan Ekspor Laporan</p>
+                <p className="text-[9.5px] text-slate-500 font-sans font-normal normal-case">Audit Antrean Kiosk Bulanan</p>
+              </div>
+              <button
+                type="button"
+                onClick={handleExportExcel}
+                className="w-full px-4 py-3 text-left text-xs text-slate-300 hover:bg-slate-800 hover:text-emerald-400 transition-colors flex items-center gap-2.5 font-semibold"
+              >
+                <span className="text-emerald-500 text-sm">📊</span>
+                <span className="font-mono text-left">Unduh Excel (.XLS)</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleExportPDF}
+                className="w-full px-4 py-3 text-left text-xs text-slate-300 hover:bg-slate-800 hover:text-indigo-400 transition-colors flex items-center gap-2.5 font-semibold"
+              >
+                <span className="text-indigo-500 text-sm">📄</span>
+                <span className="font-mono text-left">Cetak Laporan PDF</span>
+              </button>
+            </div>
+          </div>
 
           {/* Audio Announcer Button */}
           <button 

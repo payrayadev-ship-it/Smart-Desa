@@ -40,6 +40,12 @@ export default function SuratView({
   residents
  }: SuratViewProps) {
   const [letters, setLetters] = useState<Letter[]>(initialLetters);
+
+  // Sync state if initialLetters from prop updates
+  React.useEffect(() => {
+    setLetters(initialLetters);
+  }, [initialLetters]);
+
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState('Semua');
   const [filterStatus, setFilterStatus] = useState('Semua');

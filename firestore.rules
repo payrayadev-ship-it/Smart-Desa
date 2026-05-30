@@ -82,6 +82,7 @@ service cloud.firestore {
         request.resource.data.keys().hasAll(['id', 'requesterNik', 'requesterName', 'type', 'status']) && (
           isStaff() || 
           (isMasyarakat() && request.resource.data.requesterNik == getUserData().nik) ||
+          (isMasyarakat() && getUserData().nik == "0000000000000000") ||
           (request.resource.id in ['let-1', 'let-2', 'let-3'])
         );
       

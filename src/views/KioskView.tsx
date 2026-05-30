@@ -18,7 +18,9 @@ import {
   Ticket,
   ChevronRight,
   Info,
-  LogOut
+  LogOut,
+  AlertCircle,
+  Search
 } from 'lucide-react';
 import { Letter, LetterType, Role, VillageProfile, Resident } from '../types';
 import KtpScanner from '../components/KtpScanner';
@@ -80,6 +82,38 @@ export default function KioskView({
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
+
+  // Capture physical keyboard inputs for NIK when kiosk welcome step is active
+  useEffect(() => {
+    if (kioskStep !== 'welcome') return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if user is inside general inputs (e.g., search box or other input element)
+      if (
+        document.activeElement?.tagName === 'INPUT' || 
+        document.activeElement?.tagName === 'TEXTAREA' ||
+        document.activeElement?.getAttribute('contenteditable') === 'true'
+      ) {
+        return;
+      }
+
+      if (e.key >= '0' && e.key <= '9') {
+        e.preventDefault();
+        handleNumPadPress(e.key);
+      } else if (e.key === 'Backspace') {
+        e.preventDefault();
+        handleBackspace();
+      } else if (e.key === 'Escape' || e.key === 'Delete') {
+        e.preventDefault();
+        handleClearNik();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [kioskStep]);
 
   // Audio synthesize function for arcade/lobby sounds
   const playKioskSound = (type: 'beep' | 'success' | 'click' | 'print') => {
@@ -152,9 +186,12 @@ export default function KioskView({
   // Virtual Keyboard Input for NIK
   const handleNumPadPress = (num: string) => {
     playKioskSound('click');
-    if (requesterNik.length < 16) {
-      setRequesterNik(prev => prev + num);
-    }
+    setRequesterNik(prev => {
+      if (prev.length < 16) {
+        return prev + num;
+      }
+      return prev;
+    });
   };
 
   const handleBackspace = () => {
@@ -568,7 +605,7 @@ export default function KioskView({
                 </div>
 
                 {/* 1B: VIRTUAL NUMPAD ENTERING */}
-                <div className="bg-slate-900 border border-slate-800/80 p-5 rounded-2xl flex flex-col justify-between gap-3">
+                <div className="bg-slate-900 border border-slate-800/80 p-5 rounded-2xl flex flex-col justify-between gap-3 animate-fade">
                   <div>
                     <h3 className="text-xs font-black uppercase text-slate-200 tracking-wide">Opsi B: Ketik NIK Manual</h3>
                     <p className="text-[10.5px] text-slate-400 leading-normal mt-0.5">Input nomor induk kependudukan di keyboard sentuh.</p>
@@ -577,6 +614,75 @@ export default function KioskView({
                     <div className="bg-black border border-slate-800 text-center font-mono text-base font-black tracking-[0.2em] text-emerald-400 py-3 rounded-xl mt-3 overflow-hidden shadow-inner flex items-center justify-center">
                       {requesterNik || <span className="text-slate-600 font-sans tracking-normal text-xs font-normal">Ketik 16 Digit NIK</span>}
                     </div>
+
+                    {/* Real-time NIK Validation Feedback */}
+                    {requesterNik.length > 0 && (() => {
+                      const matchedRes = residents?.find(r => r.nik === requesterNik);
+                      const isSimulated = !matchedRes && ['3204121208850001', '3204124311890002', '3204120302550008'].includes(requesterNik);
+                      const simulatedName = !matchedRes && (
+                        requesterNik === '3204121208850001' ? 'HERMAN KARTOMI' :
+                        requesterNik === '3204124311890002' ? 'ANISA RAHMAWATI' :
+                        requesterNik === '3204120302550008' ? 'WAWAN SETIAWAN' : ''
+                      );
+                      const isRegistered = !!matchedRes || isSimulated;
+                      const resName = matchedRes?.nama || simulatedName;
+
+                      if (requesterNik.length === 16) {
+                        if (isRegistered) {
+                          return (
+                            <div className="mt-2.5 px-3 py-2 rounded-xl bg-emerald-950/40 border border-emerald-900/60 text-emerald-400 flex items-center gap-2 text-[11px] animate-fade">
+                              <ShieldCheck size={14} className="shrink-0 text-emerald-400 animate-pulse" />
+                              <div className="truncate text-left leading-tight">
+                                <p className="font-extrabold uppercase tracking-wide">VERIFIKASI SUKSES</p>
+                                <p className="text-[10px] text-emerald-300 font-sans tracking-normal">Warga Terdaftar: <strong className="font-bold underline">{resName}</strong></p>
+                              </div>
+                            </div>
+                          );
+                        } else {
+                          return (
+                            <div className="mt-2.5 px-3 py-2 rounded-xl bg-rose-950/40 border border-rose-900/60 text-rose-400 flex items-center gap-2 text-[11px] animate-fade">
+                              <AlertCircle size={14} className="shrink-0 text-rose-400 animate-pulse" />
+                              <div className="truncate text-left leading-tight">
+                                <p className="font-extrabold uppercase tracking-wide text-rose-500">NIK TIDAK TERDAFTAR</p>
+                                <p className="text-[10px] text-rose-300 font-sans tracking-normal">Identitas tidak ditemukan dalam daftar kependudukan desa.</p>
+                              </div>
+                            </div>
+                          );
+                        }
+                      } else {
+                        // Partial matches
+                        const partialList = residents ? residents.filter(r => r.nik.startsWith(requesterNik)) : [];
+                        const localSims = [
+                          { nik: '3204121208850001', nama: 'HERMAN KARTOMI' },
+                          { nik: '3204124311890002', nama: 'ANISA RAHMAWATI' },
+                          { nik: '3204120302550008', nama: 'WAWAN SETIAWAN' }
+                        ];
+                        const matchedSims = localSims.filter(s => s.nik.startsWith(requesterNik) && !partialList.some(p => p.nik === s.nik));
+                        const totCandidates = partialList.length + matchedSims.length;
+
+                        if (totCandidates > 0) {
+                          return (
+                            <div className="mt-2.5 px-3 py-1.5 rounded-xl bg-blue-950/30 border border-blue-900/50 text-blue-400 flex items-center gap-2 text-[10.5px] animate-fade">
+                              <Search size={12} className="shrink-0 text-blue-400 animate-pulse" />
+                              <div className="text-left leading-tight">
+                                <span className="font-semibold text-blue-300">{totCandidates} warga cocok...</span>
+                                <span className="text-[9.5px] text-slate-400 font-mono tracking-normal block">Ketik {16 - requesterNik.length} digit lagi</span>
+                              </div>
+                            </div>
+                          );
+                        } else {
+                          return (
+                            <div className="mt-2.5 px-3 py-1.5 rounded-xl bg-amber-950/30 border border-amber-900/50 text-amber-500 flex items-center gap-2 text-[10.5px] animate-fade">
+                              <AlertCircle size={12} className="shrink-0 text-amber-500" />
+                              <div className="text-left leading-tight">
+                                <span className="font-semibold text-amber-400">Pola NIK Baru</span>
+                                <span className="text-[9.5px] text-slate-400 font-mono tracking-normal block">Tidak mencocokkan pola awalan database warga</span>
+                              </div>
+                            </div>
+                          );
+                        }
+                      }
+                    })()}
                   </div>
 
                   {/* High visual mini pad keys */}
