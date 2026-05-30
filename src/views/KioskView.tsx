@@ -57,6 +57,7 @@ export default function KioskView({
   const [keperluan, setKeperluan] = useState('');
   const [karcisNo, setKarcisNo] = useState('');
   const [activeTab, setActiveTab2] = useState<'num-pad' | 'manual'>('num-pad');
+  const [loketTujuan, setLoketTujuan] = useState('Loket 1: Administrasi Umum & Kependudukan');
 
   // Dynamic state for kiosk categories & custom fields
   const [kioskCat, setKioskCat] = useState<string>('Surat Keterangan');
@@ -238,7 +239,12 @@ export default function KioskView({
     }
 
     const uniqueId = `LTR-${Date.now().toString().slice(-6)}`;
-    const randomTicketNo = `A-${Math.floor(100 + Math.random() * 950)}`;
+    
+    // Generate specialized prefixes based on loket destination
+    let prefix = 'A';
+    if (loketTujuan.includes('Loket 2')) prefix = 'B';
+    if (loketTujuan.includes('Loket 3')) prefix = 'C';
+    const randomTicketNo = `${prefix}-${Math.floor(100 + Math.random() * 950)}`;
 
     const newLetterItem: Letter = {
       id: uniqueId,
@@ -249,10 +255,13 @@ export default function KioskView({
       status: 'Diajukan',
       rtApproval: false,
       queueNumber: randomTicketNo,
+      queueDestination: loketTujuan,
+      queueStatus: 'Menunggu',
       fields: {
         "Keperluan Warga": keperluan,
         "Diinput Melalui": "Anjungan Kiosk Mandiri Kantor Desa",
         "Nomor Karcis / Antrean": randomTicketNo,
+        "Loket Layanan Tujuan": loketTujuan,
         ...(isKeteranganOrKuasa ? {
           'Tempat Lahir': birthPlace || '-',
           'Tanggal Lahir': birthDate || '-'
@@ -348,6 +357,132 @@ export default function KioskView({
       `);
       printWin.document.close();
     }
+  };
+
+  const renderKtpScannedContainer = () => {
+    if (!requesterNik) return null;
+    const activeResident = (residents || []).find(r => r.nik === requesterNik) || {
+      nik: requesterNik,
+      nama: requesterName,
+      tempatLahir: birthPlace || 'BANDUNG',
+      tanggalLahir: birthDate || '01-01-1980',
+      rt: '01',
+      rw: '02',
+      statusBansos: 'Tidak Menerima',
+      fotoKtp: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=150",
+      alamat: 'DESA SUKAMAJU'
+    };
+
+    return (
+      <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4.5 mb-5 shadow-lg animate-fade">
+        <div className="flex justify-between items-center mb-3 pb-2 border-b border-slate-800">
+          <span className="text-[10px] font-mono font-black text-blue-400 uppercase tracking-widest flex items-center gap-1.5">
+            <CheckCircle2 size={13} className="text-emerald-400" />
+            Pratinjau E-KTP Terpindai &amp; Data Ekstraksi Bersisian
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              playKioskSound('click');
+              setRequesterNik('');
+              setRequesterName('');
+              setBirthPlace('');
+              setBirthDate('');
+              setKioskStep('welcome');
+            }}
+            className="px-2.5 py-1 bg-rose-950/40 border border-rose-900/45 hover:bg-rose-900 text-rose-400 rounded-lg text-[9px] font-mono uppercase font-extrabold tracking-wider transition-all"
+          >
+            Reset / Scan Ulang
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-5 items-stretch">
+          
+          {/* AREA PRATINJAU KHUSUS (GAMBAR KTP YANG DIPINDAI) */}
+          <div className="md:col-span-5 flex flex-col justify-between bg-teal-950/40 border border-cyan-900/40 rounded-xl p-3.5 relative overflow-hidden text-white min-h-[145px]">
+            {/* Cyber grid bg */}
+            <div className="absolute inset-0 bg-[linear-gradient(rgba(34,211,238,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(34,211,238,0.04)_1px,transparent_1px)] bg-[size:8px_8px] pointer-events-none" />
+            
+            {/* Watermark map */}
+            <div className="absolute inset-0 opacity-5 pointer-events-none flex items-center justify-center font-sans font-bold text-[8.5px] tracking-widest text-cyan-300">
+              REPUBLIK INDONESIA
+            </div>
+
+            <div className="z-10 text-center border-b border-cyan-500/10 pb-1.5 mb-2 shrink-0">
+              <h4 className="text-[7px] font-serif font-black tracking-widest text-cyan-200 uppercase leading-none">PROVINSI JAWA BARAT</h4>
+              <h5 className="text-[6px] font-sans font-extrabold tracking-widest text-cyan-300 uppercase mt-0.5 leading-none">KABUPATEN BANDUNG</h5>
+            </div>
+
+            <div className="z-10 flex gap-2.5 items-start flex-grow">
+              {/* Detailed mini list simulating real printed card visual */}
+              <div className="flex-1 font-mono text-[5.5px] text-cyan-100 flex flex-col gap-0.5 leading-tight">
+                <div className="text-[7.5px] font-extrabold text-cyan-200 select-text">NIK: {activeResident.nik}</div>
+                <div>Nama: {activeResident.nama.toUpperCase()}</div>
+                <div>Tempat, Tgl: {activeResident.tempatLahir.toUpperCase()}, {activeResident.tanggalLahir}</div>
+                <div>Alamat: {activeResident.alamat.toUpperCase()}</div>
+                <div className="pl-1">RT/RW: {activeResident.rt || '01'}/{activeResident.rw || '02'}</div>
+                <div className="pl-1">Kel/Desa: SUKAMAJU</div>
+              </div>
+
+              {/* Citizen photo on the right of the card preview */}
+              <div className="w-13 h-17 rounded border border-cyan-400/25 overflow-hidden bg-slate-950 shrink-0 shadow relative">
+                {activeResident.fotoKtp && (
+                  <img 
+                    src={activeResident.fotoKtp} 
+                    alt="KTP Avatar"
+                    className="w-full h-full object-cover"
+                    referrerPolicy="no-referrer"
+                  />
+                )}
+                <div className="absolute inset-0 bg-cyan-400/5 mix-blend-color" />
+              </div>
+            </div>
+
+            <div className="z-10 flex justify-between items-center border-t border-cyan-500/10 pt-1 mt-2 text-[4px] text-cyan-300/50 font-mono tracking-widest leading-none shrink-0 uppercase">
+              <span>MASA BERLAKU: SEUMUR HIDUP</span>
+              <span className="text-emerald-400 font-bold">● SMART ID VALID</span>
+            </div>
+          </div>
+
+          {/* AREA DATA HASIL EKSTRAKSI (OCR) */}
+          <div className="md:col-span-7 bg-slate-950 border border-slate-805 rounded-xl p-4 flex flex-col justify-between">
+            <div className="grid grid-cols-2 gap-3.5 text-left font-mono">
+              <div className="col-span-2 bg-slate-900 border border-slate-800/60 rounded-lg p-2.5">
+                <span className="text-[8px] text-slate-500 uppercase tracking-widest block font-bold">Nomor Induk Kependudukan (NIK)</span>
+                <span className="text-xs font-black text-emerald-400 tracking-widest block mt-0.5 select-all">
+                  {requesterNik}
+                </span>
+              </div>
+              
+              <div>
+                <span className="text-[8px] text-slate-500 uppercase tracking-widest block">Nama Warga sesuai KTP</span>
+                <span className="text-[10.5px] font-sans font-black text-slate-200 uppercase tracking-wide block mt-0.5">
+                  {requesterName}
+                </span>
+              </div>
+
+              <div>
+                <span className="text-[8px] text-slate-500 uppercase tracking-widest block font-mono">Tempat / Tanggal Lahir</span>
+                <span className="text-[10px] text-slate-300 block mt-0.5">
+                  {birthPlace}, {birthDate}
+                </span>
+              </div>
+
+              <div className="col-span-2 border-t border-slate-900 pt-2 text-[10px] text-slate-400 leading-normal font-sans">
+                <div className="flex justify-between items-center bg-emerald-950/20 border border-emerald-900/30 p-2 rounded-lg">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                    <span className="text-[9.5px] font-mono text-emerald-400 font-bold tracking-wide">STATUS OCR: 100% DISINKRONISASI</span>
+                  </div>
+                  <span className="text-[9px] text-slate-405 font-mono bg-slate-900 px-1.5 py-0.5 rounded">RT {activeResident.rt || '01'} / RW {activeResident.rw || '02'}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -790,6 +925,33 @@ export default function KioskView({
                   </div>
                 </div>
 
+                {/* Scanned KTP image preview & extracted data side-by-side container */}
+                {renderKtpScannedContainer()}
+
+                {/* Antrean Loket Langsung Button */}
+                <div className="bg-gradient-to-r from-blue-950/50 via-indigo-950/20 to-slate-900 border border-blue-500/20 p-4 rounded-xl mb-4.5 flex flex-col md:flex-row md:items-center justify-between gap-3 animate-fade shadow-inner">
+                  <div className="space-y-0.5">
+                    <h4 className="text-xs font-black text-blue-300 font-mono tracking-wide uppercase flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
+                      Opsi Antrean Pelayanan / Loket Kantor Desa
+                    </h4>
+                    <p className="text-[10.5px] text-slate-400">Jika Anda hanya ingin bertemu petugas loket tanpa mengisi blangko surat (konsultasi, bansos, KK/KTP fisik).</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      playKioskSound('success');
+                      setSelectedType('Pelayanan Umum Loket Kantor Desa' as any);
+                      setKeperluan('Konsultasi / Pengurusan Berkas Umum di Loket Desa');
+                      setKioskStep('fill-detail');
+                    }}
+                    className="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-black uppercase tracking-wider font-mono flex items-center justify-center gap-1.5 shadow-lg shadow-blue-900/35 transition-all hover:scale-102 shrink-0 border border-blue-500"
+                  >
+                    <CheckCircle2 size={13} />
+                    <span>Ambil Karcis Antrean</span>
+                  </button>
+                </div>
+
                 {/* Tactile Category Tab Selector & Touch Search Box */}
                 <div className="space-y-3 mb-4">
                   <div className="flex flex-wrap gap-1.5 p-1 bg-slate-950 rounded-xl border border-slate-800">
@@ -913,6 +1075,9 @@ export default function KioskView({
                   </span>
                 </div>
 
+                {/* Scanned KTP image preview & extracted data side-by-side container */}
+                {renderKtpScannedContainer()}
+
                 <div className="space-y-4">
                   <div>
                     <label className="block text-[9.5px] font-bold text-slate-400 uppercase tracking-wider mb-1 font-mono">Nama Pemohon (Sesuai KTP)</label>
@@ -923,6 +1088,19 @@ export default function KioskView({
                       placeholder="Ketik Nama Lengkap Anda"
                       className="w-full bg-slate-900 border border-slate-800 focus:border-blue-500 text-white rounded-xl px-4 py-3 text-xs focus:ring-1 focus:ring-blue-500 transition-all font-semibold font-sans placeholder-slate-600"
                     />
+                  </div>
+
+                  <div>
+                    <label className="block text-[9.5px] font-bold text-slate-400 uppercase tracking-wider mb-1 font-mono">Loket Pelayanan Tujuan Antrean*</label>
+                    <select
+                      value={loketTujuan}
+                      onChange={(e) => setLoketTujuan(e.target.value)}
+                      className="w-full bg-slate-900 border border-slate-800 focus:border-blue-500 text-white rounded-xl px-4 py-3 text-xs focus:ring-1 focus:ring-blue-500 transition-all font-semibold font-sans leading-none"
+                    >
+                      <option value="Loket 1: Administrasi Umum & Kependudukan (KK/KTP)">Loket 1: Administrasi & Kependudukan (KK, KTP, Pindah Datang)</option>
+                      <option value="Loket 2: Surat Keterangan & Perizinan (SKTM/Usaha)">Loket 2: Surat Keterangan (SKTM, Izin Usaha, Surat Pengantar)</option>
+                      <option value="Loket 3: Kepala Desa / Pimpinan & Bansos">Loket 3: Kepala Desa / Pimpinan & Bantuan Sosial</option>
+                    </select>
                   </div>
 
                   {/* Conditional Birth Info for Surat Keterangan / Surat Kuasa */}

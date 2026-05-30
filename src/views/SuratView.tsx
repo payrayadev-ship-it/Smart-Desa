@@ -407,6 +407,10 @@ export default function SuratView({
     const statusMatch = filterStatus === 'Semua' || letItem.status === filterStatus;
 
     const privacyMatch = !onlyMyLetters || 
+      (currentUser && (
+        (currentUser.nik && letItem.requesterNik === currentUser.nik) ||
+        (letItem.requesterName.toLowerCase() === currentUser.name.toLowerCase())
+      )) ||
       letItem.requesterNik === '3204121208850001' || 
       letItem.requesterNik === '3204101201930005' || 
       letItem.requesterName.toUpperCase() === 'HERMAN KARTOMI';

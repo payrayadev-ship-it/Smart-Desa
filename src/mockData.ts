@@ -44,7 +44,7 @@ const INITIAL_RESIDENTS: Resident[] = [
     rw: "05",
     statusPenduduk: "Aktif",
     statusBansos: "Tidak Menerima",
-    fotoKtp: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=150"
+    fotoKtp: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=150"
   },
   {
     id: "res-2",
@@ -62,7 +62,8 @@ const INITIAL_RESIDENTS: Resident[] = [
     rt: "02",
     rw: "05",
     statusPenduduk: "Aktif",
-    statusBansos: "Tidak Menerima"
+    statusBansos: "Tidak Menerima",
+    fotoKtp: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=150"
   },
   {
     id: "res-3",
@@ -80,7 +81,8 @@ const INITIAL_RESIDENTS: Resident[] = [
     rt: "01",
     rw: "02",
     statusPenduduk: "Aktif",
-    statusBansos: "Penerima BLT"
+    statusBansos: "Penerima BLT",
+    fotoKtp: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=150"
   },
   {
     id: "res-4",

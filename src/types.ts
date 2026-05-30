@@ -80,6 +80,8 @@ export interface Letter {
   signedAt?: string;
   qrCodeDataUrl?: string;
   queueNumber?: string;
+  queueDestination?: string;
+  queueStatus?: 'Menunggu' | 'Dilayani' | 'Selesai';
   createdAt: string;
 }
 

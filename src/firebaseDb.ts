@@ -276,14 +276,33 @@ export async function syncListToFirestoreBatch(collectionPath: string, currentIt
       operations.push({ type: 'delete', docId: id });
     }
 
-    // 2. Queue set (create / update) operations
+    // 2. Queue set (create / update) operations ONLY for new or modified items
     for (const item of nextItems) {
-      const docId = item.id || `doc-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const docId = item.id;
+      
+      if (docId) {
+        // Look up if this item already exists in currentItems
+        const existingItem = currentItems.find(c => c.id === docId);
+        
+        if (existingItem) {
+          // Compare values to see if the content has actually changed
+          // We can strip updatedAt and other volatile fields during comparison
+          const { updatedAt: _u, createdAt: _c, ...itemCopy } = item;
+          const { updatedAt: _eu, createdAt: _ec, ...existingCopy } = existingItem;
+          
+          if (JSON.stringify(itemCopy) === JSON.stringify(existingCopy)) {
+            // Content is identical, skip writing to avoid permissions blocking and useless writes
+            continue;
+          }
+        }
+      }
+
+      const cleanDocId = docId || `doc-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       const cleanItem = sanitizeData(item);
-      if (!cleanItem.id) cleanItem.id = docId;
+      if (!cleanItem.id) cleanItem.id = cleanDocId;
       
       cleanItem.updatedAt = new Date().toISOString();
-      operations.push({ type: 'set', docId, data: cleanItem });
+      operations.push({ type: 'set', docId: cleanItem.id, data: cleanItem });
     }
 
     if (operations.length === 0) return;
