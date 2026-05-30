@@ -15,7 +15,7 @@ import WebDesaView from './views/WebDesaView';
 import KioskView from './views/KioskView';
 import KioskMonitorView from './views/KioskMonitorView';
 
-import { Role, Resident, Letter, FinanceTransaction, VillageAsset, Complaint, VillageAnnouncement, VillageAgenda, AuditLog, VillageProfile, PortalCredential } from './types';
+import { Role, Resident, Letter, FinanceTransaction, VillageAsset, Complaint, VillageAnnouncement, VillageAgenda, AuditLog, VillageProfile, PortalCredential, RtRwFinance } from './types';
 import { INITIAL_VILLAGE_PROFILE, LocalDb, INITIAL_PORTAL_CREDENTIALS } from './mockData';
 import PengaturanView from './views/PengaturanView';
 import LoginView from './views/LoginView';
@@ -201,6 +201,7 @@ export default function App() {
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [villageProfile, setVillageProfile] = useState<VillageProfile>(INITIAL_VILLAGE_PROFILE);
   const [portalCredentials, setPortalCredentials] = useState<{ credentials: PortalCredential[] }>(INITIAL_PORTAL_CREDENTIALS);
+  const [rtFinances, setRtFinances] = useState<RtRwFinance[]>([]);
   const [loadingDb, setLoadingDb] = useState(false);
   const [dbError, setDbError] = useState<string | null>(null);
 
@@ -302,6 +303,15 @@ export default function App() {
         );
         unsubscribes.push(unsubCredentials);
 
+        // Subscribe to rt/rw listing & finances
+        const unsubRtFinances = subscribeSingleDoc<{ finances: RtRwFinance[] }>(
+          'settings',
+          'rtFinances',
+          { finances: LocalDb.getRtFinances() },
+          (data) => setRtFinances(data?.finances || [])
+        );
+        unsubscribes.push(unsubRtFinances);
+
         setLoadingDb(false);
       } catch (err: any) {
         console.warn("Informasi koneksi dialihkan ke lokal (offline):", err.message || err);
@@ -319,6 +329,7 @@ export default function App() {
         setAuditLogs(LocalDb.getAuditLogs());
         setVillageProfile(LocalDb.getVillageProfile());
         setPortalCredentials(LocalDb.getPortalCredentials());
+        setRtFinances(LocalDb.getRtFinances());
       }
     };
 
@@ -355,6 +366,7 @@ export default function App() {
 
       await saveRecord('settings', 'villageProfile', villageProfile);
       await saveRecord('settings', 'portalCredentials', portalCredentials);
+      await saveRecord('settings', 'rtFinances', { finances: rtFinances });
 
       return true;
     } catch (error) {
@@ -439,6 +451,14 @@ export default function App() {
     });
   };
 
+  const handleSaveRtFinances = (data: RtRwFinance[]) => {
+    setRtFinances(data);
+    LocalDb.saveRtFinances(data);
+    saveRecord('settings', 'rtFinances', { finances: data }).catch(e => {
+      console.error("Gagal menyimpan data RT/RW ke Firestore:", e);
+    });
+  };
+
   const handleSaveAgendas = (data: VillageAgenda[]) => {
     setAgendas(data);
     LocalDb.saveAgendas(data);
@@ -488,6 +508,7 @@ export default function App() {
       <LoginView 
         onLoginSuccess={handleLoginSuccess}
         villageProfile={villageProfile}
+        rtFinances={rtFinances}
       />
     );
   }
@@ -617,6 +638,8 @@ export default function App() {
                   saveAgendas={handleSaveAgendas}
                   activeRole={activeRole}
                   onLogAction={handleLogAction}
+                  rtFinances={rtFinances}
+                  saveRtFinances={handleSaveRtFinances}
                 />
               )}
 

@@ -569,7 +569,9 @@ const INITIAL_RT_FINANCES: RtRwFinance[] = [
     iuranWarga: 350000,
     kasRt: 2450000,
     pengeluaranRt: 120000,
-    agendaRt: "Kerja bakti membersihkan saluran parit utama"
+    agendaRt: "Kerja bakti membersihkan saluran parit utama",
+    namaRt: "RT 01 Bojong Indah",
+    pin: "010401"
   },
   {
     id: "rtf-2",
@@ -579,7 +581,9 @@ const INITIAL_RT_FINANCES: RtRwFinance[] = [
     iuranWarga: 420000,
     kasRt: 3800000,
     pengeluaranRt: 250000,
-    agendaRt: "Pembelian tempat sampah pilah lingkungan"
+    agendaRt: "Pembelian tempat sampah pilah lingkungan",
+    namaRt: "RT 02 Babakan Makmur",
+    pin: "020502"
   }
 ];
 

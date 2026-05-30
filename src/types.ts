@@ -185,6 +185,8 @@ export interface RtRwFinance {
   kasRt: number;
   pengeluaranRt: number;
   agendaRt: string;
+  namaRt?: string;
+  pin?: string;
 }
 
 export interface AuditLog {

@@ -23,14 +23,15 @@ import { onSnapshot, doc, setDoc } from 'firebase/firestore';
 import { signInAnonymously } from 'firebase/auth';
 import { db, auth } from '../firebase';
 import { LocalDb, INITIAL_PORTAL_CREDENTIALS } from '../mockData';
-import { Role, VillageProfile, PortalCredential } from '../types';
+import { Role, VillageProfile, PortalCredential, RtRwFinance } from '../types';
 
 interface LoginViewProps {
   onLoginSuccess: (user: { name: string; role: Role; nik?: string }) => void;
   villageProfile: VillageProfile;
+  rtFinances?: RtRwFinance[];
 }
 
-export default function LoginView({ onLoginSuccess, villageProfile }: LoginViewProps) {
+export default function LoginView({ onLoginSuccess, villageProfile, rtFinances = [] }: LoginViewProps) {
   // Query parameter parser for isolation
   const getInitialPortal = (): 'staff' | 'warga' => {
     try {
@@ -210,11 +211,34 @@ export default function LoginView({ onLoginSuccess, villageProfile }: LoginViewP
     }
 
     // Match typed name and pin
-    const matchedCred = portalCredentials.credentials.find(
+    let matchedCred = portalCredentials.credentials.find(
       c => c.type === 'staf' &&
            c.name.toLowerCase() === trimmedName.toLowerCase() &&
            c.pin === pin
     );
+
+    let loggedInName = matchedCred?.name || '';
+    let loggedInRole = matchedCred?.role || 'Operator';
+
+    // Check dynamic RT/RW custom registrations if no standard credentials matched
+    if (!matchedCred && rtFinances && rtFinances.length > 0) {
+      const matchedRt = rtFinances.find(
+        rtf => (rtf.namaRt && rtf.namaRt.toLowerCase() === trimmedName.toLowerCase() && (rtf.pin || '123456') === pin) ||
+               (`rt ${rtf.rt}`.toLowerCase() === trimmedName.toLowerCase() && (rtf.pin || '123456') === pin) ||
+               (`rt ${rtf.rt} rw ${rtf.rw}`.toLowerCase() === trimmedName.toLowerCase() && (rtf.pin || '123456') === pin)
+      );
+
+      if (matchedRt) {
+        loggedInName = matchedRt.namaRt || `RT ${matchedRt.rt} RW ${matchedRt.rw}`;
+        loggedInRole = 'RT/RW';
+        matchedCred = {
+          type: 'staf',
+          name: loggedInName,
+          role: 'RT/RW',
+          pin: matchedRt.pin || '123456'
+        };
+      }
+    }
 
     if (!matchedCred) {
       playLoginSound('error');
@@ -227,8 +251,8 @@ export default function LoginView({ onLoginSuccess, villageProfile }: LoginViewP
     setSuccessAnimation(true);
     setTimeout(() => {
       onLoginSuccess({
-        name: matchedCred.name,
-        role: matchedCred.role || 'Operator'
+        name: loggedInName,
+        role: loggedInRole as Role
       });
     }, 1200);
   };
@@ -568,6 +592,36 @@ export default function LoginView({ onLoginSuccess, villageProfile }: LoginViewP
                       <option value="RT/RW">Ketua RT / RW (Kewilayahan)</option>
                       <option value="Super Admin">Super Admin (Pengendali Menyeluruh)</option>
                     </select>
+
+                    {selectedStaffRole === 'RT/RW' && rtFinances && rtFinances.length > 0 && (
+                      <div className="bg-slate-900/60 border border-slate-800 p-3 rounded-xl space-y-2 mt-2">
+                        <label className="block text-[9px] font-extrabold text-indigo-400 uppercase tracking-wider font-mono">
+                          PILIH WILAYAH RT ANDA :
+                        </label>
+                        <div className="flex flex-wrap gap-1.5">
+                          {rtFinances.map(rtf => {
+                            const name = rtf.namaRt || `RT ${rtf.rt} RW ${rtf.rw}`;
+                            const rawPin = rtf.pin || '123456';
+                            return (
+                              <button
+                                key={rtf.id}
+                                type="button"
+                                onClick={() => {
+                                  playLoginSound('click');
+                                  setStaffNameInput(name);
+                                  setPin(rawPin);
+                                  setErrorMsg(null);
+                                }}
+                                className="px-2.5 py-1.5 bg-slate-950 hover:bg-indigo-900/40 border border-slate-800 hover:border-indigo-400 rounded text-[9.5px] text-slate-300 font-mono transition-all duration-150 flex items-center gap-1 hover:text-white"
+                              >
+                                <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 shrink-0"></span>
+                                <span>{name}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div>
