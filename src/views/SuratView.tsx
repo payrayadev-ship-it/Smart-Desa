@@ -16,7 +16,7 @@ import {
   ChevronRight,
   Camera
 } from 'lucide-react';
-import { Letter, LetterType, Role, VillageProfile } from '../types';
+import { Letter, LetterType, Role, VillageProfile, Resident } from '../types';
 import KtpScanner from '../components/KtpScanner';
 import { LETTER_CATALOG } from '../letterCatalog';
 
@@ -27,6 +27,7 @@ interface SuratViewProps {
   onLogAction: (action: string, module: string) => void;
   villageProfile: VillageProfile;
   currentUser?: { name: string; role: Role; nik?: string } | null;
+  residents: Resident[];
 }
 
 export default function SuratView({
@@ -35,7 +36,8 @@ export default function SuratView({
   activeRole,
   onLogAction,
   villageProfile,
-  currentUser
+  currentUser,
+  residents
  }: SuratViewProps) {
   const [letters, setLetters] = useState<Letter[]>(initialLetters);
   const [search, setSearch] = useState('');
@@ -51,7 +53,24 @@ export default function SuratView({
   const [selectedType, setSelectedType] = useState<LetterType>('Surat Keterangan Domisili');
   const [requesterName, setRequesterName] = useState(activeRole === 'Masyarakat' && currentUser ? currentUser.name : '');
   const [requesterNik, setRequesterNik] = useState(activeRole === 'Masyarakat' && currentUser ? currentUser.nik || '' : '');
+  const [birthPlace, setBirthPlace] = useState('');
+  const [birthDate, setBirthDate] = useState('');
   const [keperluan, setKeperluan] = useState('');
+
+  // Sync lookup name when typing NIK or scanning NIK
+  const handleNikChange = (nikVal: string) => {
+    const sanitized = nikVal.replace(/\D/g, '');
+    setRequesterNik(sanitized);
+
+    if (sanitized.length === 16 && residents) {
+      const match = residents.find(r => r.nik === sanitized);
+      if (match) {
+        setRequesterName(match.nama);
+        setBirthPlace(match.tempatLahir || '');
+        setBirthDate(match.tanggalLahir || '');
+      }
+    }
+  };
 
   // Dynamically sync state if role or user session changes
   React.useEffect(() => {
@@ -61,9 +80,16 @@ export default function SuratView({
       if (currentUser) {
         setRequesterName(currentUser.name);
         setRequesterNik(currentUser.nik || '');
+        if (currentUser.nik && residents) {
+          const match = residents.find(r => r.nik === currentUser.nik);
+          if (match) {
+            setBirthPlace(match.tempatLahir || '');
+            setBirthDate(match.tanggalLahir || '');
+          }
+        }
       }
     }
-  }, [activeRole, currentUser]);
+  }, [activeRole, currentUser, residents]);
   
   // Dynamic custom fields based on selected letter type
   const [dynamicFields, setDynamicFields] = useState<Record<string, string>>({});
@@ -99,8 +125,20 @@ export default function SuratView({
       return;
     }
 
+    const isKeteranganOrKuasa = 
+      selectedType.toLowerCase().includes('keterangan') || 
+      selectedType.toLowerCase().includes('kuasa') ||
+      (() => {
+        const temp = LETTER_CATALOG.find(t => t.name === selectedType);
+        return temp ? (temp.category === 'Surat Keterangan' || temp.category === 'Surat Kuasa & Administrasi') : false;
+      })();
+
     const subFields: Record<string, string> = { 
       keperluan,
+      ...(isKeteranganOrKuasa ? {
+        'Tempat Lahir': birthPlace || '-',
+        'Tanggal Lahir': birthDate || '-'
+      } : {}),
       ...dynamicFields
     };
 
@@ -134,6 +172,8 @@ export default function SuratView({
     // Reset Form
     setRequesterName('');
     setRequesterNik('');
+    setBirthPlace('');
+    setBirthDate('');
     setKeperluan('');
     setDynamicFields({});
     setShowForm(false);
@@ -528,7 +568,7 @@ export default function SuratView({
                   type="text"
                   maxLength={16}
                   value={requesterNik}
-                  onChange={(e) => setRequesterNik(e.target.value.replace(/\D/g, ''))}
+                  onChange={(e) => handleNikChange(e.target.value)}
                   placeholder="Masukkan 16 digit NIK warga terdaftar"
                   className={`w-full text-xs p-2 border border-slate-200 rounded-lg text-slate-800 font-mono ${activeRole === 'Masyarakat' ? 'bg-slate-100 cursor-not-allowed font-extrabold text-blue-900' : 'bg-slate-50'}`}
                   readOnly={activeRole === 'Masyarakat'}
@@ -549,6 +589,40 @@ export default function SuratView({
                   required
                 />
               </div>
+
+              {/* Conditional Birth Info for Surat Keterangan / Surat Kuasa */}
+              {(selectedType.toLowerCase().includes('keterangan') || 
+                selectedType.toLowerCase().includes('kuasa') ||
+                (() => {
+                  const template = LETTER_CATALOG.find(t => t.name === selectedType);
+                  return template ? (template.category === 'Surat Keterangan' || template.category === 'Surat Kuasa & Administrasi') : false;
+                })()) && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-amber-50/50 p-3 rounded-xl border border-amber-200 animate-fade">
+                  <div>
+                    <label className="block text-[10px] font-bold text-amber-800 uppercase tracking-wider mb-1 font-mono">Tempat Lahir (Keterangan/Kuasa)*</label>
+                    <input
+                      id="form-birthplace-input"
+                      type="text"
+                      value={birthPlace}
+                      onChange={(e) => setBirthPlace(e.target.value)}
+                      placeholder="Contoh: Bandung"
+                      className="w-full text-xs font-semibold p-2 border border-amber-200 bg-white rounded-lg text-slate-800 focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-amber-800 uppercase tracking-wider mb-1 font-mono">Tanggal Lahir (Keterangan/Kuasa)*</label>
+                    <input
+                      id="form-birthdate-input"
+                      type="date"
+                      value={birthDate}
+                      onChange={(e) => setBirthDate(e.target.value)}
+                      className="w-full text-xs font-semibold p-2 border border-amber-200 bg-white rounded-lg text-slate-800 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 font-mono"
+                      required
+                    />
+                  </div>
+                </div>
+              )}
 
               {/* Dynamic Sub fields depending on state */}
               {(() => {
@@ -754,6 +828,14 @@ export default function SuratView({
           onScanSuccess={(nik, nama, additional) => {
             setRequesterNik(nik);
             setRequesterName(nama);
+            if (nik && residents) {
+              const match = residents.find(r => r.nik === nik);
+              if (match) {
+                setRequesterName(match.nama);
+                setBirthPlace(match.tempatLahir || '');
+                setBirthDate(match.tanggalLahir || '');
+              }
+            }
             if (additional?.alamat) {
               setKeperluan(`Keperluan domisili kependudukan Kp. Babakan`);
             }

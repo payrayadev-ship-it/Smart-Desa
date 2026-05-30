@@ -470,6 +470,7 @@ export default function App() {
           saveLetters={handleSaveLetters}
           onLogAction={handleLogAction}
           villageProfile={villageProfile}
+          residents={residents}
           onNavigateClose={() => {
             // Clear URL query parameters to return to normal system
             window.location.hash = '';
@@ -575,6 +576,7 @@ export default function App() {
                   onLogAction={handleLogAction}
                   villageProfile={villageProfile}
                   currentUser={currentUser}
+                  residents={residents}
                 />
               )}
 
@@ -653,6 +655,7 @@ export default function App() {
                   saveLetters={handleSaveLetters}
                   onLogAction={handleLogAction}
                   villageProfile={villageProfile}
+                  residents={residents}
                 />
               )}
 

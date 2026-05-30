@@ -20,7 +20,7 @@ import {
   Info,
   LogOut
 } from 'lucide-react';
-import { Letter, LetterType, Role, VillageProfile } from '../types';
+import { Letter, LetterType, Role, VillageProfile, Resident } from '../types';
 import KtpScanner from '../components/KtpScanner';
 import { LETTER_CATALOG } from '../letterCatalog';
 
@@ -30,6 +30,7 @@ interface KioskViewProps {
   onLogAction: (action: string, module: string) => void;
   villageProfile: VillageProfile;
   onNavigateClose?: () => void;
+  residents: Resident[];
 }
 
 export default function KioskView({
@@ -37,7 +38,8 @@ export default function KioskView({
   saveLetters,
   onLogAction,
   villageProfile,
-  onNavigateClose
+  onNavigateClose,
+  residents
 }: KioskViewProps) {
   // Navigation steps inside kiosk: 'welcome' | 'select-service' | 'fill-detail' | 'success-print'
   const [kioskStep, setKioskStep] = useState<'welcome' | 'select-service' | 'fill-detail' | 'success-print'>('welcome');
@@ -47,6 +49,8 @@ export default function KioskView({
   // Kiosk User Data
   const [requesterNik, setRequesterNik] = useState('');
   const [requesterName, setRequesterName] = useState('');
+  const [birthPlace, setBirthPlace] = useState('');
+  const [birthDate, setBirthDate] = useState('');
   const [selectedType, setSelectedType] = useState<LetterType>('Surat Keterangan Domisili');
   const [keperluan, setKeperluan] = useState('');
   const [karcisNo, setKarcisNo] = useState('');
@@ -176,6 +180,20 @@ export default function KioskView({
       }
     }
 
+    const isKeteranganOrKuasa = 
+      selectedType.toLowerCase().includes('keterangan') || 
+      selectedType.toLowerCase().includes('kuasa') ||
+      (() => {
+        const temp = LETTER_CATALOG.find(t => t.name === selectedType);
+        return temp ? (temp.category === 'Surat Keterangan' || temp.category === 'Surat Kuasa & Administrasi') : false;
+      })();
+
+    if (isKeteranganOrKuasa && (!birthPlace || !birthDate)) {
+      playKioskSound('beep');
+      alert("Harap lengkapi Tempat Lahir & Tanggal Lahir Anda!");
+      return;
+    }
+
     if (!requesterNik || !requesterName || !keperluan) {
       playKioskSound('beep');
       alert("Harap lengkapi seluruh data pemohon & deskripsi keperluan dahulu!");
@@ -198,6 +216,10 @@ export default function KioskView({
         "Keperluan Warga": keperluan,
         "Diinput Melalui": "Anjungan Kiosk Mandiri Kantor Desa",
         "Nomor Karcis / Antrean": randomTicketNo,
+        ...(isKeteranganOrKuasa ? {
+          'Tempat Lahir': birthPlace || '-',
+          'Tanggal Lahir': birthDate || '-'
+        } : {}),
         ...dynamicFields
       },
       trackingLogs: [
@@ -224,6 +246,8 @@ export default function KioskView({
     playKioskSound('beep');
     setRequesterNik('');
     setRequesterName('');
+    setBirthPlace('');
+    setBirthDate('');
     setKeperluan('');
     setKioskSearch('');
     setDynamicFields({});
@@ -604,15 +628,30 @@ export default function KioskView({
                   disabled={requesterNik.length < 16}
                   onClick={() => {
                     playKioskSound('success');
-                    // Autofill name based on NIK if available in sample profile KTPs
-                    if (requesterNik === '3204121208850001') {
-                      setRequesterName('HERMAN KARTOMI');
-                    } else if (requesterNik === '3204124311890002') {
-                      setRequesterName('ANISA RAHMAWATI');
-                    } else if (requesterNik === '3204120302550008') {
-                      setRequesterName('WAWAN SETIAWAN');
+                    // Autofill name based on NIK if available in resident list
+                    const match = residents && residents.find(r => r.nik === requesterNik);
+                    if (match) {
+                      setRequesterName(match.nama);
+                      setBirthPlace(match.tempatLahir || '');
+                      setBirthDate(match.tanggalLahir || '');
                     } else {
-                      setRequesterName('Warga Sukamaju Mandiri');
+                      if (requesterNik === '3204121208850001') {
+                        setRequesterName('HERMAN KARTOMI');
+                        setBirthPlace('Bandung');
+                        setBirthDate('1985-08-12');
+                      } else if (requesterNik === '3204124311890002') {
+                        setRequesterName('ANISA RAHMAWATI');
+                        setBirthPlace('Soreang');
+                        setBirthDate('1989-11-23');
+                      } else if (requesterNik === '3204120302550008') {
+                        setRequesterName('WAWAN SETIAWAN');
+                        setBirthPlace('Bandung');
+                        setBirthDate('1955-02-03');
+                      } else {
+                        setRequesterName('Warga Sukamaju Mandiri');
+                        setBirthPlace('-');
+                        setBirthDate('-');
+                      }
                     }
                     setKioskStep('select-service');
                   }}
@@ -780,6 +819,38 @@ export default function KioskView({
                     />
                   </div>
 
+                  {/* Conditional Birth Info for Surat Keterangan / Surat Kuasa */}
+                  {(selectedType.toLowerCase().includes('keterangan') || 
+                    selectedType.toLowerCase().includes('kuasa') ||
+                    (() => {
+                      const template = LETTER_CATALOG.find(t => t.name === selectedType);
+                      return template ? (template.category === 'Surat Keterangan' || template.category === 'Surat Kuasa & Administrasi') : false;
+                    })()) && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-950/50 p-4 rounded-xl border border-slate-800 animate-fade">
+                      <div>
+                        <label className="block text-[9.5px] font-bold text-slate-400 uppercase tracking-wider mb-1 font-mono">Tempat Lahir*</label>
+                        <input
+                          type="text"
+                          value={birthPlace}
+                          onChange={(e) => setBirthPlace(e.target.value)}
+                          placeholder="Masukkan Tempat Lahir"
+                          className="w-full bg-slate-900 border border-slate-800 focus:border-blue-500 text-white rounded-xl px-4 py-3 text-xs focus:ring-1 focus:ring-blue-500 transition-all font-semibold placeholder-slate-600 font-sans"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[9.5px] font-bold text-slate-400 uppercase tracking-wider mb-1 font-mono">Tanggal Lahir*</label>
+                        <input
+                          type="date"
+                          value={birthDate}
+                          onChange={(e) => setBirthDate(e.target.value)}
+                          className="w-full bg-slate-900 border border-slate-800 focus:border-blue-500 text-white rounded-xl px-4 py-3 text-xs focus:ring-1 focus:ring-blue-500 transition-all font-semibold placeholder-slate-600 font-mono text-left"
+                          required
+                        />
+                      </div>
+                    </div>
+                  )}
+
                   {/* Dynamic Fields for chosen template */}
                   {(() => {
                     const template = LETTER_CATALOG.find(t => t.name === selectedType);
@@ -932,6 +1003,15 @@ export default function KioskView({
           onScanSuccess={(nik, name, add) => {
             setRequesterNik(nik);
             setRequesterName(name);
+            const match = residents && residents.find(r => r.nik === nik);
+            if (match) {
+              setRequesterName(match.nama);
+              setBirthPlace(match.tempatLahir || '');
+              setBirthDate(match.tanggalLahir || '');
+            } else {
+              setBirthPlace('-');
+              setBirthDate('-');
+            }
             setKioskStep('select-service');
             setShowScanner(false);
           }}
